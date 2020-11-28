@@ -61,14 +61,14 @@ function init() {
   videoSquares[1][0].appendChild(remoteVideo);
 
   // Add the user ID input listener
-  document.querySelector('#userId').addEventListener('input', 
-    (e) => document.querySelector('#cameraBtn').disabled = false);
+  document.querySelector('#userId').oninput =
+    e => document.querySelector('#cameraBtn').disabled = false;
 
   // Add all the button click event listeners
-  document.querySelector('#cameraBtn').addEventListener('click', openUserMedia);
-  document.querySelector('#createBtn').addEventListener('click', createRoom);
-  document.querySelector('#joinBtn').addEventListener('click', joinRoom);
-  document.querySelector('#hangupBtn').addEventListener('click', hangUp);
+  document.querySelector('#cameraBtn').onclick = openUserMedia;
+  document.querySelector('#createBtn').onclick = createRoom;
+  document.querySelector('#joinBtn').onclick = joinRoom;
+  document.querySelector('#hangupBtn').onclick = hangUp;
   roomDialog = new mdc.dialog.MDCDialog(document.querySelector('#room-dialog'));
 }
 
@@ -114,11 +114,11 @@ async function createRoom() {
 
   // Collect local ICE candidates
   const callerCandidatesCollection = roomRef.collection('callerCandidates');
-  peerConnection.addEventListener('icecandidate', event => {
-    if (event.candidate) {
-      callerCandidatesCollection.add(event.candidate.toJSON());
+  peerConnection.onicecandidate = e => {
+    if (e.candidate) {
+      callerCandidatesCollection.add(e.candidate.toJSON());
     }
-  });
+  };
 
   // Create a new peer connection offer
   const offer = await peerConnection.createOffer();
@@ -156,11 +156,11 @@ async function createRoom() {
   });
 
   // Listen to receive peer's remote stream over WebRTC P2P
-  peerConnection.addEventListener('track', event => {
-    event.streams[0].getTracks().forEach(track => {
+  peerConnection.ontrack = e => {
+    e.streams[0].getTracks().forEach(track => {
       remoteStream.addTrack(track);
     });
-  });
+  };
 }
 
 function joinRoom() {
@@ -168,13 +168,12 @@ function joinRoom() {
   document.querySelector('#createBtn').disabled = true;
   document.querySelector('#joinBtn').disabled = true;
 
-  document.querySelector('#confirmJoinBtn').
-      addEventListener('click', async () => {
-        roomId = document.querySelector('#room-id').value;
-        document.querySelector(
-            '#currentRoom').innerText = `Current room is ${roomId} - You are the callee!`;       
-        await joinRoomById(roomId);
-      }, {once: true});
+  document.querySelector('#confirmJoinBtn').onclick = async () => {
+    roomId = document.querySelector('#room-id').value;
+    document.querySelector(
+        '#currentRoom').innerText = `Current room is ${roomId} - You are the callee!`;       
+    await joinRoomById(roomId);
+  };
   roomDialog.open();
 }
 
@@ -192,18 +191,18 @@ async function joinRoomById(roomId) {
 
     // Collect local ICE candidates
     const calleeCandidatesCollection = roomRef.collection('calleeCandidates');
-    peerConnection.addEventListener('icecandidate', event => {
-      if (event.candidate) {
-        calleeCandidatesCollection.add(event.candidate.toJSON());
+    peerConnection.onicecandidate = e => {
+      if (e.candidate) {
+        calleeCandidatesCollection.add(e.candidate.toJSON());
       }
-    });
+    };
 
     // Listen to receive peer's remote stream over WebRTC P2P
-    peerConnection.addEventListener('track', event => {
-      event.streams[0].getTracks().forEach(track => {
+    peerConnection.ontrack = e => {
+      e.streams[0].getTracks().forEach(track => {
         remoteStream.addTrack(track);
       });
-    });
+    };
 
     // Create SDP answer for the initial offer
     const offer = roomSnapshot.data().offer;
