@@ -1,72 +1,22 @@
-/**
- * Organization of data in Cloud Firestore...
- * 
- * - rooms (collection):
- *   - roomIds (doc):
- *       - nextRoomNum (field): 2
- *       - roomNames (field): { 'famlee': 'ROOM1', 'magic8': 'ROOM2'}
- *   - ROOM0 (doc):
- *       - roomName (field): 'famlee'
- *       - nextUserNum (field): 3
- *       - userIds (field): ['USER0', 'USER1', 'USER2']
- *       - userSettings (collection):
- *           - userNames (doc): { USER0: 'priscilla', USER1: 'phoebe', USER2: 'emma' }
- *           - userTiles (doc):
- *               - isTileAvailable (field): {
- *                    0: [ false, false, false, true ]
- *                    1: [ true , true , true , true ]
- *                    2: [ true , true , true , true ]
- *                 }
- *               - USER0 (field): { row: 0, col: 0}
- *               - USER1 (field): { row: 0, col: 1}
- *               - USER2 (field): { row: 0, col: 2}
- *       - fromUSER0 (collection):
- *           - toUSER1 (doc):
- *               - offer (field): { sdp: "<gibberish>", type: "offer" }
- *               - callerCandidates (collection)
- *               - answer (field): { sdp: "<gibberish>", type: "answer" }
- *               - callerCandidates (collection)
- *           - toUSER2 (doc)
- *       - fromUSER1 (collection):
- *           - toUSER0 (doc)
- *           - toUSER2 (doc)
- *       - fromUSER2 (collection):
- *           - toUSER0 (doc)
- *           - toUSER1 (doc)
- *   - ROOM1 (doc):
- *       - roomName (field): 'magic8'
- *       - nextUserNum (field): 0
- *       - userIds (field): []
- *       - userSettings (collection)
- */
-
-
-const configuration = {
-  iceServers: [
-    {
-      urls: [
-        'stun:stun1.l.google.com:19302',
-        'stun:stun2.l.google.com:19302',
-      ],
-    },
-  ],
+// Constants
+const CONFIGURATION = {
   iceCandidatePoolSize: 10,
+  iceServers: [{
+    urls: [
+      'stun:stun1.l.google.com:19302',
+      'stun:stun2.l.google.com:19302',
+    ],
+  }]
 };
-
 const MAX_BITRATE = 250000;
 const SCALE_RESOLUTION_DOWN_BY = 2;
 
+// Global variables
 let peerConnection = null;
 let localStream = null;
 let remoteStream = null;
 let roomDialog = null;
 let roomId = null;
-
-const randomRoomIds = [
-  'alligator', 'beaver', 'chipmunk', 'dolphin', 'elephant', 'flamingo', 'gorilla', 
-  'hippo', 'iguana', 'jellyfish', 'kangaroo', 'llama', 'monkey', 'narwhal', 'octopus', 
-  'penguin', 'quail', 'rhino', 'shark', 'turkey', 'unicorn', 'vulture', 'whale', 'zebra'
-];
 
 function init() {
   var NUM_ROWS = 7;
@@ -143,14 +93,20 @@ async function createRoom() {
   document.querySelector('#createBtn').disabled = true;
   document.querySelector('#joinBtn').disabled = true;
 
+  // Get a new room number
+  const roomIdsDoc = await firebase.firestore().collection('rooms').doc('roomIds');
+  const roomIdsDocSnapshot = await roomIdsDoc.get();
+  const roomNum = roomIdsDocSnapshot.data().nextRoomNum;
+  roomId = 'ROOM' + roomNum;
+  roomIdsDoc.update({ 'nextRoomNum': roomNum + 1 })
+
   // Create new room document
-  const roomId = randomRoomIds[Math.floor(Math.random() * randomRoomIds.length)];
   const roomRef = await firebase.firestore().collection('rooms').doc(roomId);
   document.querySelector(
-      '#currentRoom').innerText = `Current room is ${roomRef.id} - You are the caller!`;
+      '#currentRoom').innerText = `Current room is ${roomId} - You are the caller!`;
 
   // Set up new peer connection, and send in local media stream
-  peerConnection = new RTCPeerConnection(configuration);
+  peerConnection = new RTCPeerConnection(CONFIGURATION);
   localStream.getTracks().forEach(track => {
     peerConnection.addTrack(track, localStream);
   });
@@ -227,7 +183,7 @@ async function joinRoomById(roomId) {
 
   if (roomSnapshot.exists) {
     // Set up new peer connection, and send in local media stream
-    peerConnection = new RTCPeerConnection(configuration);
+    peerConnection = new RTCPeerConnection(CONFIGURATION);
     localStream.getTracks().forEach(track => {
       peerConnection.addTrack(track, localStream);
     });
