@@ -10,6 +10,8 @@ const CONFIGURATION = {
 };
 const MAX_BITRATE = 250000;
 const SCALE_RESOLUTION_DOWN_BY = 2;
+const NUM_ROWS = 5;
+const NUM_COLS = 12;
 
 // Global variables
 let roomId = null;
@@ -127,26 +129,6 @@ function _doUserExit(remoteUserId) {
 }
 
 /*******************************************************************************
- * TODO! Open user media
- ******************************************************************************/
-async function openUserMedia(e) {
-  const stream = await navigator.mediaDevices.getUserMedia(
-      {video: true, audio: true});
-  document.querySelector('#localVideo').srcObject = stream;
-  localStream = stream;
-
-  document.querySelector('#cameraBtn').disabled = true;
-  document.querySelector('#joinBtn').disabled = false;
-  document.querySelector('#createBtn').disabled = false;
-  document.querySelector('#hangupBtn').disabled = false;
-
-  // Display the user ID
-  document.querySelector('#userName').disabled = true;
-  localUserName = document.querySelector('#userName').value;
-  document.querySelector('#currentUser').innerText = `User is ${localUserName}`;
-}
-
-/*******************************************************************************
  * Wait for other user(s) to join or leave the room
  ******************************************************************************/
 function _waitForOtherUsers(roomDoc) {
@@ -196,7 +178,6 @@ async function createRoom(roomName) {
       [roomNameToIdRoomName]: roomId
     });
   }
-  document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
 
   // Grab a user ID, and add it to the list
   const roomDoc = roomsCollection.doc(roomId);
@@ -233,7 +214,6 @@ async function joinRoom(roomName) {
     return;
   }
   const roomId = roomNameToId[roomName];
-  document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
 
   // Grab a user ID
   const roomDoc = roomsCollection.doc(roomId);
@@ -315,12 +295,77 @@ async function hangUp(e) {
 }
 
 /*******************************************************************************
+ * On cameraBtn click, open user media
+ ******************************************************************************/
+async function _onCameraBtnClick(e) {
+  const userNameInput = document.querySelector('#userNameInput');
+  const roomNameInput = document.querySelector('#roomNameInput');
+  const createBtn = document.querySelector('#createBtn');
+  const joinBtn = document.querySelector('#joinBtn');
+
+  // Hide camera button, and enable username and room name input
+  document.querySelector('#cameraBtn').style.display = "none";
+  userNameInput.disabled = false;
+  roomNameInput.disabled = false;
+
+  // Capture the local stream
+  localStream = await navigator.mediaDevices.getUserMedia(
+      {video: true, audio: true});
+  document.querySelector('#localVideo').srcObject = localStream;
+  document.querySelector('#localVideoPreview').srcObject = localStream;
+
+  // Enable create and join room buttons on input
+  function enableCreateOrJoinRoom() {
+    if (userNameInput.value && roomNameInput.value) {
+      createBtn.disabled = false;
+      joinBtn.disabled = false;
+    } else {
+      createBtn.disabled = true;
+      joinBtn.disabled = true;
+    }
+  }
+  userNameInput.oninput = enableCreateOrJoinRoom;
+  roomNameInput.oninput = enableCreateOrJoinRoom;
+}
+
+/*******************************************************************************
+ * TODO! On createBtn click...
+ ******************************************************************************/
+async function _onCreateBtnClick(e) {
+  localUserName = document.querySelector('#userNameInput').value;
+  roomName = document.querySelector('#roomNameInput').value;
+  document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
+  document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
+  document.querySelector('#homePage').style.display = "none";
+  document.querySelector('#roomPage').style.display = "block";
+
+  createRoom(roomName);
+}
+
+/*******************************************************************************
+ * TODO! On joinBtn click...
+ ******************************************************************************/
+async function _onJoinBtnClick(e) {
+  localUserName = document.querySelector('#userNameInput').value;
+  roomName = document.querySelector('#roomNameInput').value;
+  document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
+  document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
+  document.querySelector('#homePage').style.display = "none";
+  document.querySelector('#roomPage').style.display = "block";
+
+  joinRoom(roomName);
+}
+
+/*******************************************************************************
+ * TODO! On hangupBtn click...
+ ******************************************************************************/
+async function _onHangupBtnClick(e) {
+}
+
+/*******************************************************************************
  * TODO! Initialize the DOM elements (videos, buttons, etc)
  ******************************************************************************/
 function initDomElements() {
-  var NUM_ROWS = 7;
-  var NUM_COLS = 16;
-
   // Add a grid of video squares
   var videoSquares = [];
   for(var i = 0; i < NUM_ROWS; i++) {
@@ -352,30 +397,11 @@ function initDomElements() {
   remoteVideo.playsinline = true;
   videoSquares[1][0].appendChild(remoteVideo);
 
-  // Add the user ID input listener
-  document.querySelector('#userName').oninput =
-    e => document.querySelector('#cameraBtn').disabled = false;
-
   // Add all the button click event listeners
-  document.querySelector('#cameraBtn').onclick = openUserMedia;
-  document.querySelector('#createBtn').onclick = () => {
-    document.querySelector('#createBtn').disabled = true;
-    document.querySelector('#joinBtn').disabled = true;
-    createRoom('magic8');
-  };
-  document.querySelector('#joinBtn').onclick = () => {
-    document.querySelector('#createBtn').disabled = true;
-    document.querySelector('#joinBtn').disabled = true;
-    document.querySelector('#confirmJoinBtn').onclick = async () => {
-      roomName = document.querySelector('#room-id').value;
-      document.querySelector('#currentRoom').innerText = 
-        `Current room is ${roomName} - You are the callee!`;       
-      await joinRoom(roomName);
-    };
-    roomDialog.open();
-  };
-  document.querySelector('#hangupBtn').onclick = hangUp;
-  roomDialog = new mdc.dialog.MDCDialog(document.querySelector('#room-dialog'));
+  document.querySelector('#cameraBtn').onclick = _onCameraBtnClick;
+  document.querySelector('#createBtn').onclick = _onCreateBtnClick;
+  document.querySelector('#joinBtn').onclick = _onJoinBtnClick;
+  document.querySelector('#hangupBtn').onclick = _onHangupBtnClick;
 }
 
 initDomElements();

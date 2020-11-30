@@ -1,5 +1,31 @@
+@media (max-width: 1200px) {
+    #homePage {
+        min-width: 1024px;
+    }
+}
+
+#localVideoPreviewContainer, #localVideoPreview {
+    display: block;
+    height: 400px;
+    width: 400px;
+    margin: auto;
+}
+
+#cameraBtn {
+    position: absolute;
+    top: 42%;
+    left: 0;
+    right: 0;
+    margin: auto;
+}
+
+.localVideo {
+    background: black;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
 body {
-    background: #ECEFF1;
     color: rgba(0, 0, 0, 0.87);
     font-family: Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
@@ -77,8 +103,8 @@ button {
 
 div#videoGrid {
     display: grid;
-    grid-template-rows: repeat(7,160px);
-    grid-template-columns: repeat(16,160px);
+    grid-template-rows: repeat(5, 120px);
+    grid-template-columns: repeat(12, 120px);
 }
 
 div#videoGrid > .videoSquare {
@@ -92,8 +118,8 @@ div#videoGrid > .videoSquare {
 div#videoGrid > .videoSquare > video {
     background: black;
     display: block;
-    height: 140px;
-    width: 140px;
+    height: 100px;
+    width: 100px;
     object-fit: cover;
 }
 
