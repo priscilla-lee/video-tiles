@@ -78,10 +78,12 @@ async function _downscaleVideo(peerConnection) {
 async function _onUserJoin(doc, remoteUserId) {
   let peerConnection = _createPeerConnection(doc, localUserId, remoteUserId);
 
-  // Respond to the offer
+  // Receive the offer
   const docSnapshot = await doc.get();
   await peerConnection.setRemoteDescription(
     new RTCSessionDescription(docSnapshot.data().offer));
+
+  // Send a response
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
   await doc.update({answer: { type: answer.type, sdp: answer.sdp }});
@@ -145,6 +147,25 @@ async function openUserMedia(e) {
 }
 
 /*******************************************************************************
+ * Wait for other user(s) to join or leave the room
+ ******************************************************************************/
+function _waitForOtherUsers(roomDoc) {
+  roomDoc.collection(`from${localUserId}`).onSnapshot(snapshot => {
+    snapshot.docChanges().forEach(async change => {
+      if (change.type === 'added') {
+        // A user has joined the room
+        const remoteUserId = change.doc.id.substring(2);
+        _onUserJoin(change.doc.ref, remoteUserId);
+      } else if (change.type === 'removed') {
+        // A user has exited the room
+        const remoteUserId = change.doc.id.substring(2);
+        _onUserExit(remoteUserId);
+      }
+    });
+  });
+}
+
+/*******************************************************************************
  * Create a new room (first user on the video call)
  ******************************************************************************/
 async function createRoom(roomName) {
@@ -196,20 +217,7 @@ async function createRoom(roomName) {
     USER0: { row: 0, col: 0 }
   });
 
-  // Wait for other user(s) to join or leave the room
-  roomDoc.collection(`from${localUserId}`).onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(async change => {
-      if (change.type === 'added') {
-        // A user has joined the room
-        const remoteUserId = change.doc.id.substring(2);
-        _onUserJoin(change.doc.ref, remoteUserId);
-      } else if (change.type === 'removed') {
-        // A user has exited the room
-        const remoteUserId = change.doc.id.substring(2);
-        _onUserExit(remoteUserId);
-      }
-    });
-  });
+  _waitForOtherUsers(roomDoc);
 }
 
 /*******************************************************************************
@@ -249,9 +257,7 @@ async function joinRoom(roomName) {
 
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
-  await userSettings.doc('userNames').update({
-    [localUserId]: localUserName 
-  });
+  await userSettings.doc('userNames').update({ [localUserId]: localUserName });
   await userSettings.doc('userTiles').update({
     isTileAvailable: {
       0: [false, false, true],
@@ -261,20 +267,7 @@ async function joinRoom(roomName) {
     [localUserId]: { row: 0, col: 1 }
   });
 
-  // Wait for other user(s) to join or leave the room
-  roomDoc.collection(`from${localUserId}`).onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(async change => {
-      if (change.type === 'added') {
-        // A user has joined the room
-        const remoteUserId = change.doc.id.substring(2);
-        _onUserJoin(change.doc.ref, remoteUserId);
-      } else if (change.type === 'removed') {
-        // A user has exited the room
-        const remoteUserId = change.doc.id.substring(2);
-        _onUserExit(remoteUserId);
-      }
-    });
-  });
+  _waitForOtherUsers(roomDoc);
 }
 
 /*******************************************************************************
