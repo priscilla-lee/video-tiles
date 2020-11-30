@@ -1,16 +1,16 @@
-/**********************************************************************************
+/*******************************************************************************
  * Organization of data in Cloud Firestore
- **********************************************************************************/
+ ******************************************************************************/
 rooms (collection):
     roomIds (doc):
         nextRoomNum (field): 2
-        roomNames (field): { 'famlee': 'ROOM0', 'magic8': 'ROOM1'}
+        roomNameToId (field): { 'famlee': 'ROOM0', 'magic8': 'ROOM1'}
     ROOM0 (doc):
         roomName (field): 'famlee'
         nextUserNum (field): 3
         userIds (field): ['USER0', 'USER1', 'USER2']
         userSettings (collection):
-            userNames (doc): { USER0: 'priscilla', USER1: 'phoebe', USER2: 'emma' }
+            userNames (doc): { USER0: 'pris', USER1: 'phoebe', USER2: 'emma' }
             userTiles (doc):
                 isTileAvailable (field): {
                     0: [ false, false, false, true ]
@@ -23,16 +23,13 @@ rooms (collection):
         fromUSER0 (collection):
             toUSER1 (doc):
                 offer (field): { sdp: "<gibberish>", type: "offer" }
-                callerCandidates (collection)
                 answer (field): { sdp: "<gibberish>", type: "answer" }
-                callerCandidates (collection)
+                USER0candidates (collection)
+                USER1candidates (collection)
             toUSER2 (doc)
         fromUSER1 (collection):
-            toUSER0 (doc)
             toUSER2 (doc)
-        fromUSER2 (collection):
-            toUSER0 (doc)
-            toUSER1 (doc)
+        fromUSER2 (collection)
     ROOM1 (doc):
         roomName (field): 'magic8'
         nextUserNum (field): 1
