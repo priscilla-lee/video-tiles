@@ -20,6 +20,7 @@ const NUM_ROWS = 6;
 const NUM_COLS = 12;
 
 // Global variables
+let roomsCollection = null;
 let roomId = null;
 let roomName = null;
 let videoGrid = null;
@@ -30,6 +31,8 @@ let localStream = null;
 let coordinates = {};
 let peerConnections = {};
 let remoteStreams = {};
+
+// TODO: Improve performance by swapping "awaits" for callbacks when possible.
 
 /*******************************************************************************
  * Create a peer connection between the local and remote users
@@ -175,8 +178,32 @@ async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
 /*******************************************************************************
  * Move video tile locations, and broadcast the update to all users in the call
  ******************************************************************************/
-function _doUserMove(TODO) {
-  // TODO: Implement this function
+async function _doUserMove(newCoordinates) {
+  // Update coordinates
+  const oldCoordinates = coordinates[localUserId];
+  coordinates[localUserId] = newCoordinates;
+  await roomsCollection.doc(roomId).collection('userSettings')
+    .doc(`${localUserId}coordinates`).update(newCoordinates);
+
+  // Update isTileAvailable (locally and in firestore)
+  isTileAvailable[oldCoordinates.row][oldCoordinates.col] = true;
+  isTileAvailable[newCoordinates.row][newCoordinates.col] = false;
+  await roomsCollection.doc(roomId).collection('userSettings')
+    .doc('userTiles').update({ isAvailable: isTileAvailable });
+
+  // Update the local user's video position
+  const oldVideo = videoGrid[oldCoordinates.row][oldCoordinates.col]
+  oldVideo.srcObject = null;
+  oldVideo.muted = false;
+  oldVideo.setAttribute("id", "");
+  const newVideo = videoGrid[newCoordinates.row][newCoordinates.col];
+  newVideo.srcObject = localStream;
+  oldVideo.muted = true;
+  newVideo.setAttribute("id", "localVideo");
+
+  // TODO: Update the volume of all the remote users' audio
+
+  // TODO: Update the colors of all the video tiles
 }
 
 /*******************************************************************************
@@ -225,7 +252,7 @@ function _waitForOtherUsers(roomDoc) {
  ******************************************************************************/
 async function _createRoom(roomName) {
   // Verify that this room name isn't being used already
-  const roomsCollection = await firebase.firestore().collection('rooms');
+  roomsCollection = await firebase.firestore().collection('rooms');
   const roomIds = await roomsCollection.doc('roomIds').get();
   if (roomIds.data()) {
     const roomNameToId = roomIds.data().roomNameToId;
@@ -286,7 +313,7 @@ async function _createRoom(roomName) {
  ******************************************************************************/
 async function _joinRoom(roomName) {
   // Grab the roomId
-  const roomsCollection = await firebase.firestore().collection('rooms');
+  roomsCollection = await firebase.firestore().collection('rooms');
   const roomIds = await roomsCollection.doc('roomIds').get();
   const roomNameToId = roomIds.data().roomNameToId;
   if (!roomIds.data() || !Object.keys(roomNameToId).includes(roomName)) {
@@ -376,7 +403,7 @@ async function _leaveRoom(roomId) {
 
   // Delete room on hangup
   if (roomId) {
-    const roomRef = firebase.firestore().collection('rooms').doc(roomId);
+    const roomRef = roomsCollection.doc(roomId);
     const calleeCandidates = await roomRef.collection('calleeCandidates').get();
     calleeCandidates.forEach(async candidate => {
       await candidate.ref.delete();
@@ -395,15 +422,13 @@ async function _leaveRoom(roomId) {
  * On videoTile click, update the local user's location on the tile grid.
  ******************************************************************************/
 async function _onVideoTileClick(row, col) {
-  // TODO: Update the userSettings document to broadcast to other users.
+  // TODO: Add another step here (like a "Move here" button).
 
-  // TODO: Implement this function
-
-  console.log("Video tile [" + row + ", " + col + "] was clicked");
-
-  // TODO: Update the colors of the video tiles.
-
-  // TODO: Update the volumes of all the remote users.
+  if (isTileAvailable[row][col]) {
+    _doUserMove({row: row, col: col});
+  } else {
+    console.log("That tile is already occupied!");
+  }
 }
 
 /*******************************************************************************
@@ -422,7 +447,11 @@ function _initializeVideoGrid() {
       // Create a video tile
       let videoTile = document.createElement("div");
       videoTile.setAttribute("class", "videoTile");
-      videoTile.onclick = () => _onVideoTileClick(r, c);
+      videoTile.onclick = (function() { 
+        var _r = r;
+        var _c = c;
+        return () => _onVideoTileClick(_r, _c);
+      })();
 
       // Create a video element
       let video = document.createElement("video");
