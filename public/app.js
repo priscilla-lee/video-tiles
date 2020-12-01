@@ -27,13 +27,13 @@ let localUserName = null;
 let localStream = null;
 let peerConnections = {};
 let remoteStreams = {};
-let roomDialog = null;
 let videoGrid = null;
+let tileLoc = null;
 
 /*******************************************************************************
  * Create a peer connection between the local and remote users
  ******************************************************************************/
-function _createPeerConnection(doc, localUserId, remoteUserId) {
+function _createPeerConnection(p2pDoc, localUserId, remoteUserId) {
   // (1a) Send in local stream through a new peer connection
   let peerConnection = new RTCPeerConnection(CONFIGURATION);
   peerConnections[`to${remoteUserId}`] = peerConnection;
@@ -48,17 +48,14 @@ function _createPeerConnection(doc, localUserId, remoteUserId) {
     e.streams[0].getTracks().forEach(t => {remoteStream.addTrack(t);});
   };
 
-  // TODO: Add the remote video to the correct tile.
-  document.querySelector('#remoteVideo').srcObject = remoteStream;
-
   // (2a) Add local ICE candidates
-  const candidates = doc.collection(`${localUserId}candidates`);
+  const candidates = p2pDoc.collection(`${localUserId}candidates`);
   peerConnection.onicecandidate = e => {
     if (e.candidate) { candidates.add(e.candidate.toJSON()); }
   };
 
   // (2b) Listen for remote ICE candidates
-  doc.collection(`${remoteUserId}candidates`).onSnapshot(snapshot => {
+  p2pDoc.collection(`${remoteUserId}candidates`).onSnapshot(snapshot => {
     snapshot.docChanges().forEach(async change => {
       if (change.type === 'added') {
         await peerConnection.addIceCandidate(
@@ -86,22 +83,27 @@ async function _downscaleVideo(peerConnection) {
 /*******************************************************************************
  * Respond to the given user joining the call
  ******************************************************************************/
-async function _onUserJoin(doc, remoteUserId) {
-  let peerConnection = _createPeerConnection(doc, localUserId, remoteUserId);
+async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
+  let peerConnection = _createPeerConnection(p2pDoc, localUserId, remoteUserId);
 
   // Receive the offer
-  const docSnapshot = await doc.get();
+  const docSnapshot = await p2pDoc.get();
   await peerConnection.setRemoteDescription(
     new RTCSessionDescription(docSnapshot.data().offer));
 
   // Send a response
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
-  await doc.update({answer: { type: answer.type, sdp: answer.sdp }});
+  await p2pDoc.update({answer: { type: answer.type, sdp: answer.sdp }});
 
   _downscaleVideo(peerConnection);
 
-  // TODO: Add the incoming user to the correct tile.
+  // Add the incoming remote user's video stream to the correct tile
+  const userTiles = 
+    await roomDoc.collection('userSettings').doc('userTiles').get();
+  const remoteUserLoc = userTiles.data()[remoteUserId];
+  videoGrid[remoteUserLoc.row][remoteUserLoc.col].srcObject = 
+    remoteStreams[remoteUserId];
 
   // TODO: Add a tiny pop up notification when a user joins (using a Bootstrap
   // toast component).
@@ -117,11 +119,11 @@ function _onUserExit(remoteUserId) {
 /*******************************************************************************
  * Initiate a connection with the given user in the call
  ******************************************************************************/
-async function _doUserJoin(doc, remoteUserId) {
-  let peerConnection = _createPeerConnection(doc, localUserId, remoteUserId);
+async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
+  let peerConnection = _createPeerConnection(p2pDoc, localUserId, remoteUserId);
 
   // Listen for a response
-  doc.onSnapshot(async snapshot => {
+  p2pDoc.onSnapshot(async snapshot => {
     const data = snapshot.data();
     if (!peerConnection.currentRemoteDescription && data && data.answer) {
       await peerConnection.setRemoteDescription(
@@ -132,9 +134,16 @@ async function _doUserJoin(doc, remoteUserId) {
   // Initiate an offer
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
-  await doc.set({offer: { type: offer.type, sdp: offer.sdp }});
+  await p2pDoc.set({offer: { type: offer.type, sdp: offer.sdp }});
 
   _downscaleVideo(peerConnection);
+
+  // Add the other remote user's video stream to the correct tile
+  const userTiles = 
+    await roomDoc.collection('userSettings').doc('userTiles').get();
+  const remoteUserLoc = userTiles.data()[remoteUserId];
+  videoGrid[remoteUserLoc.row][remoteUserLoc.col].srcObject = 
+    remoteStreams[remoteUserId];
 }
 
 /*******************************************************************************
@@ -153,7 +162,7 @@ function _waitForOtherUsers(roomDoc) {
       if (change.type === 'added') {
         // A user has joined the room
         const remoteUserId = change.doc.id.substring(2);
-        _onUserJoin(change.doc.ref, remoteUserId);
+        _onUserJoin(roomDoc, change.doc.ref, remoteUserId);
       } else if (change.type === 'removed') {
         // A user has exited the room
         const remoteUserId = change.doc.id.substring(2);
@@ -166,7 +175,7 @@ function _waitForOtherUsers(roomDoc) {
 /*******************************************************************************
  * Create a new room (first user on the video call)
  ******************************************************************************/
-async function createRoom(roomName) {
+async function _createRoom(roomName) {
   // Verify that this room name isn't being used already
   const roomsCollection = await firebase.firestore().collection('rooms');
   const roomIds = await roomsCollection.doc('roomIds').get();
@@ -207,12 +216,20 @@ async function createRoom(roomName) {
   await userSettings.doc('userNames').set({ USER0: localUserName });
   let isTileAvailable = {};
   for (var r = 0; r < NUM_ROWS; r++) {
-    isTileAvailable[r] = new Array(NUM_COLS).fill(false);
+    isTileAvailable[r] = new Array(NUM_COLS).fill(true);
   }
+  isTileAvailable[0][0] = false;
+  tileLoc = { row: 0, col: 0 };
   await userSettings.doc('userTiles').set({
     isTileAvailable: isTileAvailable,
-    USER0: { row: 0, col: 0 }
+    USER0: tileLoc
   });
+
+  // Display the user's local video
+  const localVideo = videoGrid[0][0];
+  localVideo.setAttribute("id", "localVideo");
+  localVideo.muted = true;
+  localVideo.srcObject = localStream;
 
   _waitForOtherUsers(roomDoc);
 }
@@ -220,7 +237,7 @@ async function createRoom(roomName) {
 /*******************************************************************************
  * Join a room (initiate peer connections with all the users in the room)
  ******************************************************************************/
-async function joinRoom(roomName) {
+async function _joinRoom(roomName) {
   // Grab the roomId
   const roomsCollection = await firebase.firestore().collection('rooms');
   const roomIds = await roomsCollection.doc('roomIds').get();
@@ -229,23 +246,13 @@ async function joinRoom(roomName) {
     console.log("This room name doesn't exist!");
     return;
   }
-  const roomId = roomNameToId[roomName];
+  roomId = roomNameToId[roomName];
 
-  // Grab a user ID
+  // Grab a user ID, and add it to the list
   const roomDoc = roomsCollection.doc(roomId);
   const room = await roomDoc.get();
   const localUserNum = room.data().nextUserNum;
   localUserId = `USER${localUserNum}`;
-
-  // Initiate peer connections with all the users in the room
-  const userIds = room.data().userIds;
-  for (var i in userIds) {
-    const remoteUserId = userIds[i];
-    let doc = roomDoc.collection(`from${remoteUserId}`).doc(`to${localUserId}`);
-    _doUserJoin(doc, remoteUserId);
-  }
-
-  // Add the user ID to the list
   await roomDoc.update({ 
     nextUserNum: localUserNum + 1, 
     userIds: firebase.firestore.FieldValue.arrayUnion(localUserId)
@@ -254,14 +261,41 @@ async function joinRoom(roomName) {
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
   await userSettings.doc('userNames').update({ [localUserId]: localUserName });
+  let isTileAvailable = await userSettings.doc('userTiles').get();
+  isTileAvailable = isTileAvailable.data().isTileAvailable;
+
+  function selectAvailableTile(isTileAvailable) {
+    for (var r in isTileAvailable) {
+      for (var c in isTileAvailable[r]) {
+        if (isTileAvailable[r][c]) {
+          isTileAvailable[r][c] = false;
+          return { row: r, col: c };
+        }
+      }
+    } return null;
+  }
+  tileLoc = selectAvailableTile(isTileAvailable);
+
   await userSettings.doc('userTiles').update({
-    isTileAvailable: {
-      0: [false, false, true],
-      1: [true , true, true],
-      2: [true , true, true],
-    },
-    [localUserId]: { row: 0, col: 1 }
+    isTileAvailable: isTileAvailable,
+    [localUserId]: tileLoc
   });
+
+  // Display the user's local video
+  const localVideo = videoGrid[tileLoc.row][tileLoc.col];
+  localVideo.setAttribute("id", "localVideo");
+  localVideo.muted = true;
+  localVideo.srcObject = localStream;
+
+  // Initiate peer connections with all the users in the room
+  const userIds = room.data().userIds;
+  for (var i in userIds) {
+    const remoteUserId = userIds[i];
+    _doUserJoin(
+      roomDoc,
+      roomDoc.collection(`from${remoteUserId}`).doc(`to${localUserId}`), 
+      remoteUserId);
+  }
 
   _waitForOtherUsers(roomDoc);
 }
@@ -269,7 +303,7 @@ async function joinRoom(roomName) {
 /*******************************************************************************
  * Leave the room (terminate peer connections with all the users in the room)
  ******************************************************************************/
-async function leaveRoom(roomId) {
+async function _leaveRoom(roomId) {
   // TODO: Implement this function
 
   return;
@@ -310,6 +344,54 @@ async function leaveRoom(roomId) {
   }
 
   document.location.reload(true);
+}
+
+/*******************************************************************************
+ * On videoTile click, update the local user's location on the tile grid.
+ ******************************************************************************/
+async function _onVideoTileClick(row, col) {
+  // TODO: Implement this function
+  console.log("Video tile [" + row + ", " + col + "] was clicked");
+
+  // TODO: Update the colors of the video tiles.
+
+  // TODO: Update the volumes of all the remote users.
+
+  // TODO: Update the userSettings document to broadcast to other users.
+}
+
+/*******************************************************************************
+ * Initialize the grid of video elements, each inside a video tile
+ ******************************************************************************/
+function _initializeVideoGrid() {
+  // Create the grid of videos
+  videoGrid = [];
+  for (var i = 0; i < NUM_ROWS; i++) {
+    videoGrid[i] = new Array(NUM_COLS);
+  }
+
+  let videoTileGrid = document.querySelector("#videoTileGrid");
+  for (var r = 0; r < NUM_ROWS; r++) {
+    for (var c = 0; c < NUM_COLS; c++) {
+      // Create a video tile
+      let videoTile = document.createElement("div");
+      videoTile.setAttribute("class", "videoTile");
+      videoTile.onclick = () => _onVideoTileClick(r, c);
+
+      // Create a video element
+      let video = document.createElement("video");
+      video.autoplay = true;
+      video.playsinline = true;
+
+      // Put it all together
+      videoGrid[r][c] = video;
+      videoTile.appendChild(video);
+      videoTileGrid.appendChild(videoTile);
+    }
+  }
+
+  // TODO: Listen to changes in the userSettings document. Update
+  // the positions (and volumes) of other users when anything changes.
 }
 
 /*******************************************************************************
@@ -358,7 +440,7 @@ async function _onCreateBtnClick(e) {
   // used") using Bootstrap alert components.
 
   _initializeVideoGrid();
-  await createRoom(roomName);
+  await _createRoom(roomName);
 
   // Only display the room page when everything's loaded
   document.querySelector('#homePage').style.display = "none";
@@ -378,7 +460,7 @@ async function _onJoinBtnClick(e) {
   // using Bootstrap alert components.
 
   _initializeVideoGrid();
-  await joinRoom(roomName);
+  await _joinRoom(roomName);
 
   // Only display the room page when everything's loaded
   document.querySelector('#homePage').style.display = "none";
@@ -391,63 +473,7 @@ async function _onJoinBtnClick(e) {
 async function _onHangupBtnClick(e) {
   // TODO: Implement this function
 
-  // leaveRoom(roomId);
-}
-
-/*******************************************************************************
- * On videoTile click, update the local user's location on the tile grid.
- ******************************************************************************/
-async function _onVideoTileClick(row, col) {
-  // TODO: Implement this function
-  console.log("Video tile [" + row + ", " + col + "] was clicked");
-
-  // TODO: Update the colors of the video tiles.
-
-  // TODO: Update the volumes of all the remote users.
-
-  // TODO: Update the userSettings document to broadcast to other users.
-}
-
-/*******************************************************************************
- * Initialize the grid of video elements, each inside a video tile
- ******************************************************************************/
-function _initializeVideoGrid() {
-  // Create the grid of videos
-  videoGrid = [];
-  for (var i = 0; i < NUM_ROWS; i++) {
-    videoGrid[i] = new Array(NUM_COLS);
-  }
-
-  let videoTileGrid = document.querySelector("#videoTileGrid");
-  for (var r = 0; r < NUM_ROWS; r++) {
-    for (var c = 0; c < NUM_COLS; c++) {
-      // Create a video tile
-      let videoTile = document.createElement("div");
-      videoTile.setAttribute("class", "videoTile");
-      videoTile.onclick = () => _onVideoTileClick(r, c);
-
-      // Create a viedo element
-      let video = document.createElement("video");
-      video.autoplay = true;
-      video.playsinline = true;
-
-      // Put it all together
-      videoGrid[r][c] = video;
-      videoTile.appendChild(video);
-      videoTileGrid.appendChild(videoTile);
-    }
-  }
-
-  // TODO: Listen to changes in the userSettings document. Update
-  // the positions (and volumes) of other users when anything changes.
-
-  // Add the user's local video
-  videoGrid[0][0].setAttribute("id", "localVideo");
-  videoGrid[0][0].muted = true;
-  videoGrid[0][0].srcObject = localStream;
-
-  // Add the peer's remote video
-  videoGrid[1][0].setAttribute("id", "remoteVideo");
+  // _leaveRoom(roomId);
 }
 
 // Add all the button click event listeners
