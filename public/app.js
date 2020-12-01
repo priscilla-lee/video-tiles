@@ -22,13 +22,14 @@ const NUM_COLS = 12;
 // Global variables
 let roomId = null;
 let roomName = null;
+let videoGrid = null;
+let isTileAvailable = null;
 let localUserId = null;
 let localUserName = null;
 let localStream = null;
+let coordinates = {};
 let peerConnections = {};
 let remoteStreams = {};
-let videoGrid = null;
-let tileLoc = null;
 
 /*******************************************************************************
  * Create a peer connection between the local and remote users
@@ -81,7 +82,7 @@ async function _downscaleVideo(peerConnection) {
 }
 
 /*******************************************************************************
- * Respond to the given user joining the call
+ * Respond to the given remote user joining the call
  ******************************************************************************/
 async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   let peerConnection = _createPeerConnection(p2pDoc, localUserId, remoteUserId);
@@ -99,10 +100,13 @@ async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   _downscaleVideo(peerConnection);
 
   // Add the incoming remote user's video stream to the correct tile
-  const userTiles = 
-    await roomDoc.collection('userSettings').doc('userTiles').get();
-  const remoteUserLoc = userTiles.data()[remoteUserId];
-  videoGrid[remoteUserLoc.row][remoteUserLoc.col].srcObject = 
+  // TODO: Factor out a helper function so we don't repeat code in
+  // _onUserJoin and _doUserJoin.
+  const remoteUserCoordinates = await roomDoc.collection('userSettings')
+    .doc(`${remoteUserId}coordinates`).get();
+  const remoteCoordinates = remoteUserCoordinates.data();
+  coordinates[remoteUserId] = remoteCoordinates;
+  videoGrid[remoteCoordinates.row][remoteCoordinates.col].srcObject = 
     remoteStreams[remoteUserId];
 
   // TODO: Add a tiny pop up notification when a user joins (using a Bootstrap
@@ -110,7 +114,28 @@ async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
 }
 
 /*******************************************************************************
- * Respond to the given user exiting the call
+ * Respond to the given remote user moving video tile locations
+ ******************************************************************************/
+async function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
+  // Update coordinates
+  const oldCoordinates = coordinates[remoteUserId];
+  coordinates[remoteUserId] = newCoordinates;
+
+  // Update isTileAvailable
+  const userTilesSnapshot = 
+    await roomDoc.collection('userSettings').doc('userTiles').get();
+  isTileAvailable = userTilesSnapshot.data().isAvailable;
+
+  // Update the remote user's video position
+  videoGrid[oldCoordinates.row][oldCoordinates.col].srcObject = null;
+  videoGrid[newCoordinates.row][newCoordinates.col].srcObject = 
+    remoteStreams[remoteUserId];
+
+  // TODO: Update the remote user's audio volume.
+}
+
+/*******************************************************************************
+ * Respond to the given remote user exiting the call
  ******************************************************************************/
 function _onUserExit(remoteUserId) {
   // TODO: Implement this function
@@ -139,11 +164,19 @@ async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
   _downscaleVideo(peerConnection);
 
   // Add the other remote user's video stream to the correct tile
-  const userTiles = 
-    await roomDoc.collection('userSettings').doc('userTiles').get();
-  const remoteUserLoc = userTiles.data()[remoteUserId];
-  videoGrid[remoteUserLoc.row][remoteUserLoc.col].srcObject = 
+  const remoteUserCoordinates = await roomDoc.collection('userSettings')
+    .doc(`${remoteUserId}coordinates`).get();
+  const remoteCoordinates = remoteUserCoordinates.data();
+  coordinates[remoteUserId] = remoteCoordinates;
+  videoGrid[remoteCoordinates.row][remoteCoordinates.col].srcObject = 
     remoteStreams[remoteUserId];
+}
+
+/*******************************************************************************
+ * Move video tile locations, and broadcast the update to all users in the call
+ ******************************************************************************/
+function _doUserMove(TODO) {
+  // TODO: Implement this function
 }
 
 /*******************************************************************************
@@ -154,7 +187,7 @@ function _doUserExit(remoteUserId) {
 }
 
 /*******************************************************************************
- * Wait for other user(s) to join or leave the room
+ * Wait for other user(s) to join the room, move tiles, or leave the room
  ******************************************************************************/
 function _waitForOtherUsers(roomDoc) {
   roomDoc.collection(`from${localUserId}`).onSnapshot(snapshot => {
@@ -167,6 +200,21 @@ function _waitForOtherUsers(roomDoc) {
         // A user has exited the room
         const remoteUserId = change.doc.id.substring(2);
         _onUserExit(remoteUserId);
+      }
+    });
+  });
+
+  roomDoc.collection(`userSettings`).onSnapshot(snapshot => {
+    snapshot.docChanges().forEach(async change => {
+      if (change.type === 'modified') {
+        const docId = change.doc.id;
+        if (docId.includes("coordinates")) {
+          const remoteUserId = docId.substring(0, docId.length - 11);
+          if (remoteUserId != localUserId) {
+            // A user moved the location of their video tile
+            _onUserMove(roomDoc, change.doc.data(), remoteUserId);
+          }
+        }
       }
     });
   });
@@ -214,16 +262,15 @@ async function _createRoom(roomName) {
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
   await userSettings.doc('userNames').set({ USER0: localUserName });
-  let isTileAvailable = {};
+  isTileAvailable = {};
   for (var r = 0; r < NUM_ROWS; r++) {
     isTileAvailable[r] = new Array(NUM_COLS).fill(true);
   }
   isTileAvailable[0][0] = false;
-  tileLoc = { row: 0, col: 0 };
-  await userSettings.doc('userTiles').set({
-    isTileAvailable: isTileAvailable,
-    USER0: tileLoc
-  });
+  localCoordinates = { row: 0, col: 0 };
+  coordinates[localUserId] = localCoordinates;
+  await userSettings.doc('userTiles').set({isAvailable: isTileAvailable});
+  await userSettings.doc('USER0coordinates').set(localCoordinates);
 
   // Display the user's local video
   const localVideo = videoGrid[0][0];
@@ -261,28 +308,26 @@ async function _joinRoom(roomName) {
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
   await userSettings.doc('userNames').update({ [localUserId]: localUserName });
-  let isTileAvailable = await userSettings.doc('userTiles').get();
-  isTileAvailable = isTileAvailable.data().isTileAvailable;
+  const userTilesSnapshot = await userSettings.doc('userTiles').get();
+  isTileAvailable = userTilesSnapshot.data().isAvailable;
 
-  function selectAvailableTile(isTileAvailable) {
-    for (var r in isTileAvailable) {
-      for (var c in isTileAvailable[r]) {
-        if (isTileAvailable[r][c]) {
-          isTileAvailable[r][c] = false;
+  function selectAvailableTile(isAvailable) {
+    for (var r in isAvailable) {
+      for (var c in isAvailable[r]) {
+        if (isAvailable[r][c]) {
+          isAvailable[r][c] = false;
           return { row: r, col: c };
         }
       }
     } return null;
   }
-  tileLoc = selectAvailableTile(isTileAvailable);
-
-  await userSettings.doc('userTiles').update({
-    isTileAvailable: isTileAvailable,
-    [localUserId]: tileLoc
-  });
+  localCoordinates = selectAvailableTile(isTileAvailable);
+  coordinates[localUserId] = localCoordinates;
+  await userSettings.doc('userTiles').set({isAvailable: isTileAvailable});
+  await userSettings.doc(`${localUserId}coordinates`).set(localCoordinates);
 
   // Display the user's local video
-  const localVideo = videoGrid[tileLoc.row][tileLoc.col];
+  const localVideo = videoGrid[localCoordinates.row][localCoordinates.col];
   localVideo.setAttribute("id", "localVideo");
   localVideo.muted = true;
   localVideo.srcObject = localStream;
@@ -350,14 +395,15 @@ async function _leaveRoom(roomId) {
  * On videoTile click, update the local user's location on the tile grid.
  ******************************************************************************/
 async function _onVideoTileClick(row, col) {
+  // TODO: Update the userSettings document to broadcast to other users.
+
   // TODO: Implement this function
+
   console.log("Video tile [" + row + ", " + col + "] was clicked");
 
   // TODO: Update the colors of the video tiles.
 
   // TODO: Update the volumes of all the remote users.
-
-  // TODO: Update the userSettings document to broadcast to other users.
 }
 
 /*******************************************************************************
@@ -389,9 +435,6 @@ function _initializeVideoGrid() {
       videoTileGrid.appendChild(videoTile);
     }
   }
-
-  // TODO: Listen to changes in the userSettings document. Update
-  // the positions (and volumes) of other users when anything changes.
 }
 
 /*******************************************************************************
