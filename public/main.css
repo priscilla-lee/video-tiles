@@ -5,6 +5,7 @@
 }
 
 #localVideoPreviewContainer, #localVideoPreview {
+    border-radius: 15px;
     display: block;
     height: 400px;
     width: 400px;
@@ -23,6 +24,18 @@
     background: black;
     object-fit: cover;
     transform: scaleX(-1);
+}
+
+::-webkit-scrollbar {
+    height: 15px;
+    width: 15px;
+    background-color: #F0F0F0;
+}
+
+::-webkit-scrollbar-thumb {
+    border-radius: 10px;
+    border: 2px solid #4178a4;
+    background-image: -webkit-radial-gradient(circle, #a4c2db, #4178a4);
 }
 
 body {
@@ -93,36 +106,35 @@ body {
     }
 }
 
-body {
-    margin: 1em;
-}
-
 button {
     margin: 0.2em 0.1em;
 }
 
-div#videoGrid {
+div#videoTileGrid {
+    background: white;
     display: grid;
-    grid-template-rows: repeat(5, 120px);
-    grid-template-columns: repeat(12, 120px);
+    grid-template-rows: repeat(6, 200px);
+    grid-template-columns: repeat(12, 200px);
 }
 
-div#videoGrid > .videoSquare {
+div#videoTileGrid > .videoTile {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: grey;
-    border: 1px solid white;
+    border: 3px solid white;
+    background: lightsteelblue;
+    border-radius: 5px;
 }
 
-div#videoGrid > .videoSquare > video {
-    background: black;
+div#videoTileGrid > .videoTile > video {
+    background: transparent;
     display: block;
-    height: 100px;
-    width: 100px;
+    height: 180px;
+    width: 180px;
     object-fit: cover;
+    border-radius: 5px;
 }
 
-div#videoGrid > .videoSquare > #localVideo {
+div#videoTileGrid > .videoTile > #localVideo {
     transform: scaleX(-1);
 }

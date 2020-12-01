@@ -8,9 +8,15 @@ const CONFIGURATION = {
     ],
   }]
 };
+const COLORS = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
+  NEAREST:  "#a4c2db", // 75%
+  NEAR:     "#6d9dc5", // 60%
+  FAR:      "#4178a4", // 45%
+  FARTHEST: "#2c506d"  // 30%
+}
 const MAX_BITRATE = 250000;
 const SCALE_RESOLUTION_DOWN_BY = 2;
-const NUM_ROWS = 5;
+const NUM_ROWS = 6;
 const NUM_COLS = 12;
 
 // Global variables
@@ -22,6 +28,7 @@ let localStream = null;
 let peerConnections = {};
 let remoteStreams = {};
 let roomDialog = null;
+let videoGrid = null;
 
 /*******************************************************************************
  * Create a peer connection between the local and remote users
@@ -40,6 +47,8 @@ function _createPeerConnection(doc, localUserId, remoteUserId) {
   peerConnection.ontrack = e => {
     e.streams[0].getTracks().forEach(t => {remoteStream.addTrack(t);});
   };
+
+  // TODO: Add the remote video to the correct tile.
   document.querySelector('#remoteVideo').srcObject = remoteStream;
 
   // (2a) Add local ICE candidates
@@ -91,12 +100,18 @@ async function _onUserJoin(doc, remoteUserId) {
   await doc.update({answer: { type: answer.type, sdp: answer.sdp }});
 
   _downscaleVideo(peerConnection);
+
+  // TODO: Add the incoming user to the correct tile.
+
+  // TODO: Add a tiny pop up notification when a user joins (using a Bootstrap
+  // toast component).
 }
 
 /*******************************************************************************
- * TODO! Respond to the given user exiting the call
+ * Respond to the given user exiting the call
  ******************************************************************************/
 function _onUserExit(remoteUserId) {
+  // TODO: Implement this function
 }
 
 /*******************************************************************************
@@ -123,9 +138,10 @@ async function _doUserJoin(doc, remoteUserId) {
 }
 
 /*******************************************************************************
- * TODO! Terminate the connection with the given user in the call
+ * Terminate the connection with the given user in the call
  ******************************************************************************/
 function _doUserExit(remoteUserId) {
+  // TODO: Implement this function
 }
 
 /*******************************************************************************
@@ -189,12 +205,12 @@ async function createRoom(roomName) {
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
   await userSettings.doc('userNames').set({ USER0: localUserName });
+  let isTileAvailable = {};
+  for (var r = 0; r < NUM_ROWS; r++) {
+    isTileAvailable[r] = new Array(NUM_COLS).fill(false);
+  }
   await userSettings.doc('userTiles').set({
-    isTileAvailable: {
-      0: [false, true, true],
-      1: [true , true, true],
-      2: [true , true, true],
-    },
+    isTileAvailable: isTileAvailable,
     USER0: { row: 0, col: 0 }
   });
 
@@ -251,9 +267,11 @@ async function joinRoom(roomName) {
 }
 
 /*******************************************************************************
- * TODO! Join a room (initiate peer connections with all the users in the room)
+ * Leave the room (terminate peer connections with all the users in the room)
  ******************************************************************************/
-async function hangUp(e) {
+async function leaveRoom(roomId) {
+  // TODO: Implement this function
+
   return;
 
   const tracks = document.querySelector('#localVideo').srcObject.getTracks();
@@ -311,7 +329,6 @@ async function _onCameraBtnClick(e) {
   // Capture the local stream
   localStream = await navigator.mediaDevices.getUserMedia(
       {video: true, audio: true});
-  document.querySelector('#localVideo').srcObject = localStream;
   document.querySelector('#localVideoPreview').srcObject = localStream;
 
   // Enable create and join room buttons on input
@@ -329,79 +346,112 @@ async function _onCameraBtnClick(e) {
 }
 
 /*******************************************************************************
- * TODO! On createBtn click...
+ * On createBtn click, create a new room with the given name.
  ******************************************************************************/
 async function _onCreateBtnClick(e) {
   localUserName = document.querySelector('#userNameInput').value;
   roomName = document.querySelector('#roomNameInput').value;
   document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
   document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
+
+  // TODO: Add a validation error message (e.g. "that room name is already being 
+  // used") using Bootstrap alert components.
+
+  _initializeVideoGrid();
+  await createRoom(roomName);
+
+  // Only display the room page when everything's loaded
   document.querySelector('#homePage').style.display = "none";
   document.querySelector('#roomPage').style.display = "block";
-
-  createRoom(roomName);
 }
 
 /*******************************************************************************
- * TODO! On joinBtn click...
+ * On joinBtn click, join the room with the given name.
  ******************************************************************************/
 async function _onJoinBtnClick(e) {
   localUserName = document.querySelector('#userNameInput').value;
   roomName = document.querySelector('#roomNameInput').value;
   document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
   document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
+
+  // TODO: Add a validation error message (e.g. "that room name doesn't exist")
+  // using Bootstrap alert components.
+
+  _initializeVideoGrid();
+  await joinRoom(roomName);
+
+  // Only display the room page when everything's loaded
   document.querySelector('#homePage').style.display = "none";
   document.querySelector('#roomPage').style.display = "block";
-
-  joinRoom(roomName);
 }
 
 /*******************************************************************************
- * TODO! On hangupBtn click...
+ * On hangupBtn click, leave the room.
  ******************************************************************************/
 async function _onHangupBtnClick(e) {
+  // TODO: Implement this function
+
+  // leaveRoom(roomId);
 }
 
 /*******************************************************************************
- * TODO! Initialize the DOM elements (videos, buttons, etc)
+ * On videoTile click, update the local user's location on the tile grid.
  ******************************************************************************/
-function initDomElements() {
-  // Add a grid of video squares
-  var videoSquares = [];
-  for(var i = 0; i < NUM_ROWS; i++) {
-      videoSquares[i] = new Array(NUM_COLS);
+async function _onVideoTileClick(row, col) {
+  // TODO: Implement this function
+  console.log("Video tile [" + row + ", " + col + "] was clicked");
+
+  // TODO: Update the colors of the video tiles.
+
+  // TODO: Update the volumes of all the remote users.
+
+  // TODO: Update the userSettings document to broadcast to other users.
+}
+
+/*******************************************************************************
+ * Initialize the grid of video elements, each inside a video tile
+ ******************************************************************************/
+function _initializeVideoGrid() {
+  // Create the grid of videos
+  videoGrid = [];
+  for (var i = 0; i < NUM_ROWS; i++) {
+    videoGrid[i] = new Array(NUM_COLS);
   }
 
-  let videoGrid = document.querySelector("#videoGrid");
-  for (var row = 0; row < NUM_ROWS; row++) {
-    for (var col = 0; col < NUM_COLS; col++) {
-      let videoSquare = document.createElement("div");
-      videoSquare.setAttribute("class", "videoSquare");
-      videoGrid.appendChild(videoSquare);
-      videoSquares[row][col] = videoSquare;
+  let videoTileGrid = document.querySelector("#videoTileGrid");
+  for (var r = 0; r < NUM_ROWS; r++) {
+    for (var c = 0; c < NUM_COLS; c++) {
+      // Create a video tile
+      let videoTile = document.createElement("div");
+      videoTile.setAttribute("class", "videoTile");
+      videoTile.onclick = () => _onVideoTileClick(r, c);
+
+      // Create a viedo element
+      let video = document.createElement("video");
+      video.autoplay = true;
+      video.playsinline = true;
+
+      // Put it all together
+      videoGrid[r][c] = video;
+      videoTile.appendChild(video);
+      videoTileGrid.appendChild(videoTile);
     }
   }
 
+  // TODO: Listen to changes in the userSettings document. Update
+  // the positions (and volumes) of other users when anything changes.
+
   // Add the user's local video
-  let localVideo = document.createElement("video");
-  localVideo.setAttribute("id", "localVideo");
-  localVideo.muted = true;
-  localVideo.autoplay = true;
-  localVideo.playsinline = true;
-  videoSquares[0][0].appendChild(localVideo);
+  videoGrid[0][0].setAttribute("id", "localVideo");
+  videoGrid[0][0].muted = true;
+  videoGrid[0][0].srcObject = localStream;
 
   // Add the peer's remote video
-  let remoteVideo = document.createElement("video");
-  remoteVideo.setAttribute("id", "remoteVideo");
-  remoteVideo.autoplay = true;
-  remoteVideo.playsinline = true;
-  videoSquares[1][0].appendChild(remoteVideo);
-
-  // Add all the button click event listeners
-  document.querySelector('#cameraBtn').onclick = _onCameraBtnClick;
-  document.querySelector('#createBtn').onclick = _onCreateBtnClick;
-  document.querySelector('#joinBtn').onclick = _onJoinBtnClick;
-  document.querySelector('#hangupBtn').onclick = _onHangupBtnClick;
+  videoGrid[1][0].setAttribute("id", "remoteVideo");
 }
 
-initDomElements();
+// Add all the button click event listeners
+document.querySelector('#cameraBtn').onclick = _onCameraBtnClick;
+document.querySelector('#createBtn').onclick = _onCreateBtnClick;
+document.querySelector('#joinBtn').onclick = _onJoinBtnClick;
+document.querySelector('#hangupBtn').onclick = _onHangupBtnClick;

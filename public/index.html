@@ -26,7 +26,7 @@
 <body>
 
 <!-- The home page that the user initially sees -->
-<div id="homePage" class="container" style="padding-top:15vh;">
+<div id="homePage" class="container" style="padding-top: 15vh;">
     <div class="row">
         <div class="col-1"></div>
         <div class="col-5">
@@ -60,11 +60,13 @@
 
 <!-- The room page that the user sees once they create or join a room -->
 <div id="roomPage" style="display: none;">
+    <div id="videoTileGrid"></div>
     <p id="currentUser"></p>
     <p id="currentRoom"></p>
-    <div id="videoGrid"></div>
+    <button id="hangupBtn" type="button" class="btn btn-danger">
+        Leave Room
+    </button>
 </div>
-
 
 <script src="app.js"></script>
 </body>
