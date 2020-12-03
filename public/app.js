@@ -24,20 +24,50 @@ let roomsCollection = null;
 let roomId = null;
 let roomName = null;
 let videoGrid = null;
-let isTileAvailable = null;
 let localUserId = null;
 let localUserName = null;
 let localStream = null;
-let coordinates = {};
+let allCoordinates = {};
 let peerConnections = {};
 let remoteStreams = {};
 
-// TODO: There is either a bug in isTileAvailable and isAvailable (they don't
-// seem to be in sync, and even when they are, they're not always accurate), or
-// the latency is causing weird race conditions. Consider removing the 
-// "isTileAvailable" altogether, and just iterating through all remote users'
-// coordinates when checking if a tile is available. In hindsight, this is 
-// probably a simpler, less error-prone, better approach.
+/*******************************************************************************
+ * Returns true if the video tile specified by the given coordinates is
+ * available (not currently occupied).
+ ******************************************************************************/
+function _isTileAvailable(potentialCoordinates) {
+  const pRow = potentialCoordinates.row;
+  const pCol = potentialCoordinates.col;
+
+  for (var userId in allCoordinates) {
+    const existingCoordinates = allCoordinates[userId];
+    const eRow = existingCoordinates.row;
+    const eCol = existingCoordinates.col;
+    if (pRow == eRow && pCol == eCol) return false;
+  }
+  return true;
+}
+
+/*******************************************************************************
+ * Returns the first available tile based on the list of given userCoordinates
+ * doc snapshots.
+ ******************************************************************************/
+function _getAvailableTile(userCoordinates) {
+  for (var i in userCoordinates) {
+    const snapshot = userCoordinates[i];
+    allCoordinates[snapshot.id] = snapshot.data();
+  }
+
+  // Find the first available tile
+  for (var r = 0; r < NUM_ROWS; r++) {
+    for (var c = 0; c < NUM_COLS; c++) {
+      const coordinates = {row: r, col: c}
+      if (_isTileAvailable(coordinates)) {
+        return coordinates;
+      }
+    }
+  } return null;
+}
 
 /*******************************************************************************
  * Create a peer connection between the local and remote users
@@ -63,7 +93,7 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
   roomDoc.collection('userSettings')
     .doc(`${remoteUserId}coordinates`).get().then(snapshot => {
       const remoteCoords = snapshot.data();
-      coordinates[remoteUserId] = remoteCoords;
+      allCoordinates[remoteUserId] = remoteCoords;
       videoGrid[remoteCoords.row][remoteCoords.col].srcObject = remoteStream;
   });
 
@@ -104,7 +134,7 @@ function _downscaleVideo(peerConnection) {
 /*******************************************************************************
  * Respond to the given remote user joining the call
  ******************************************************************************/
-async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
+function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
 
   // TODO: Add a tiny pop up notification when a user joins (using a Bootstrap
@@ -129,22 +159,17 @@ async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
 /*******************************************************************************
  * Respond to the given remote user moving video tile locations
  ******************************************************************************/
-async function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
+function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
   console.log("_onUserMove");
 
-  // Update coordinates
-  const oldCoordinates = coordinates[remoteUserId];
-  coordinates[remoteUserId] = newCoordinates;
+  // Update all coordinates
+  const oldCoordinates = allCoordinates[remoteUserId];
+  allCoordinates[remoteUserId] = newCoordinates;
 
   // Update the remote user's video position
   videoGrid[oldCoordinates.row][oldCoordinates.col].srcObject = null;
   videoGrid[newCoordinates.row][newCoordinates.col].srcObject = 
     remoteStreams[remoteUserId];
-
-  // Update isTileAvailable
-  const userTilesSnapshot = 
-    await roomDoc.collection('userSettings').doc('userTiles').get();
-  isTileAvailable = userTilesSnapshot.data().isAvailable;
 
   // TODO: Update the remote user's audio volume.
 }
@@ -161,7 +186,7 @@ function _onUserExit(remoteUserId) {
 /*******************************************************************************
  * Initiate a connection with the given user in the call
  ******************************************************************************/
-async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
+function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_doUserJoin");
 
   let peerConnection = 
@@ -186,12 +211,12 @@ async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
 /*******************************************************************************
  * Move video tile locations, and broadcast the update to all users in the call
  ******************************************************************************/
-async function _doUserMove(newCoordinates) {
+function _doUserMove(newCoordinates) {
   console.log("_doUserMove");
 
   // Update coordinates
-  const oldCoordinates = coordinates[localUserId];
-  coordinates[localUserId] = newCoordinates;
+  const oldCoordinates = allCoordinates[localUserId];
+  allCoordinates[localUserId] = newCoordinates;
   roomsCollection.doc(roomId).collection('userSettings')
     .doc(`${localUserId}coordinates`).update(newCoordinates);
 
@@ -204,13 +229,6 @@ async function _doUserMove(newCoordinates) {
   newVideo.srcObject = localStream;
   newVideo.muted = true;
   newVideo.setAttribute("id", "localVideo");
-
-
-  // Update isTileAvailable (locally and in firestore)
-  isTileAvailable[oldCoordinates.row][oldCoordinates.col] = true;
-  isTileAvailable[newCoordinates.row][newCoordinates.col] = false;
-  await roomsCollection.doc(roomId).collection('userSettings')
-    .doc('userTiles').update({ isAvailable: isTileAvailable });
 
   // TODO: Update the volume of all the remote users' audio
 
@@ -306,14 +324,8 @@ async function _createRoom(roomName) {
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
   userSettings.doc('userNames').set({ USER0: localUserName });
-  isTileAvailable = {};
-  for (var r = 0; r < NUM_ROWS; r++) {
-    isTileAvailable[r] = new Array(NUM_COLS).fill(true);
-  }
-  isTileAvailable[0][0] = false;
   localCoordinates = { row: 0, col: 0 };
-  coordinates[localUserId] = localCoordinates;
-  await userSettings.doc('userTiles').set({isAvailable: isTileAvailable});
+  allCoordinates[localUserId] = localCoordinates;
   userSettings.doc('USER0coordinates').set(localCoordinates);
 
   // Display the user's local video
@@ -351,25 +363,15 @@ async function _joinRoom(roomName) {
     userIds: firebase.firestore.FieldValue.arrayUnion(localUserId)
   });
 
-  // Update user settings
+  // Find available coordinates
   const userSettings = roomDoc.collection('userSettings');
-  userSettings.doc('userNames').update({ [localUserId]: localUserName });
-  const userTilesSnapshot = await userSettings.doc('userTiles').get();
-  isTileAvailable = userTilesSnapshot.data().isAvailable;
+  const userSettingsSnapshot = await userSettings.get();
+  localCoordinates = _getAvailableTile(
+    userSettingsSnapshot.docs.filter(doc => doc.id.includes("coordinates")));
+  allCoordinates[localUserId] = localCoordinates;
 
-  function selectAvailableTile(isAvailable) {
-    for (var r in isAvailable) {
-      for (var c in isAvailable[r]) {
-        if (isAvailable[r][c]) {
-          isTileAvailable[r][c] = false;
-          return { row: r, col: c };
-        }
-      }
-    } return null;
-  }
-  localCoordinates = selectAvailableTile(isTileAvailable);
-  coordinates[localUserId] = localCoordinates;
-  await userSettings.doc('userTiles').set({isAvailable: isTileAvailable});
+  // Update user settings
+  userSettings.doc('userNames').update({ [localUserId]: localUserName });
   userSettings.doc(`${localUserId}coordinates`).set(localCoordinates);
 
   // Display the user's local video
@@ -447,8 +449,9 @@ function _onVideoTileClick(row, col) {
 
   // TODO: Add another step here (like a "Move here" button).
 
-  if (isTileAvailable[row][col]) {
-    _doUserMove({row: row, col: col});
+  const coordinates = {row: row, col: col};
+  if (_isTileAvailable(coordinates)) {
+    _doUserMove(coordinates);
   } else {
     console.log("That tile is already occupied!");
   }
