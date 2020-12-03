@@ -141,7 +141,7 @@ function _downscaleVideo(peerConnection) {
 function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
 
-  // TODO: Add a tiny pop up notification when a user joins (using a Bootstrap
+  // TODO(7): Add a tiny pop up notification when a user joins (using a Bootstrap
   // toast component).
 
   let peerConnection = 
@@ -175,7 +175,7 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
   videoGrid[newCoordinates.row][newCoordinates.col].srcObject = 
     remoteStreams[remoteUserId];
 
-  // TODO: Update the remote user's audio volume.
+  // TODO(4): Update the remote user's audio volume.
 }
 
 /*******************************************************************************
@@ -184,7 +184,7 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
 function _onUserExit(remoteUserId) {
   console.log("_onUserExit");
 
-  // TODO: Implement this function
+  // TODO(5): Implement this function
 }
 
 /*******************************************************************************
@@ -234,9 +234,9 @@ function _doUserMove(newCoordinates) {
   newVideo.muted = true;
   newVideo.setAttribute("id", "localVideo");
 
-  // TODO: Update the volume of all the remote users' audio
+  // TODO(4): Update the volume of all the remote users' audio
 
-  // TODO: Update the colors of all the video tiles
+  // TODO(3): Update the colors of all the video tiles
 }
 
 /*******************************************************************************
@@ -245,7 +245,7 @@ function _doUserMove(newCoordinates) {
 function _doUserExit(remoteUserId) {
   console.log("_doUserExit");
 
-  // TODO: Implement this function
+  // TODO(5): Implement this function
 }
 
 /*******************************************************************************
@@ -400,7 +400,7 @@ async function _joinRoom(roomName) {
 async function _leaveRoom(roomId) {
   console.log("_leaveRoom");
 
-  // TODO: Implement this function
+  // TODO(5): Implement this function
 
   return;
 
@@ -448,7 +448,7 @@ async function _leaveRoom(roomId) {
 function _onVideoTileClick(row, col) {
   console.log("_onVideoTileClick");
 
-  // TODO: Add another step here (like a "Move here" button).
+  // TODO(6): Add another step here (like a "Move here" button).
 
   const coordinates = {row: row, col: col};
   if (_isTileAvailable(coordinates)) {
@@ -541,10 +541,10 @@ function _onCreateBtnClick(e) {
   document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
   document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
 
-  // TODO: Add a validation error message (e.g. "that room name is already being 
-  // used") using Bootstrap alert components.
+  // TODO(2): Add a validation error message (e.g. "that room name is already 
+  // being used") using Bootstrap alert components.
 
-  // TODO: Only initialize the video grid if we get a RESPONSE.SUCCESS. 
+  // TODO(1): Only initialize the video grid if we get a RESPONSE.SUCCESS. 
   // Otherwise, there's a chance we might call _initializeVideoGrid twice...It
   // might be better to pull out the verification check into a separate function.
 
@@ -569,10 +569,10 @@ function _onJoinBtnClick(e) {
   document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
   document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
 
-  // TODO: Add a validation error message (e.g. "that room name doesn't exist")
-  // using Bootstrap alert components.
+  // TODO(2): Add a validation error message (e.g. "that room name doesn't 
+  // exist") using Bootstrap alert components.
 
-  // TODO: Only initialize the video grid if we get a RESPONSE.SUCCESS. 
+  // TODO(1): Only initialize the video grid if we get a RESPONSE.SUCCESS. 
   // Otherwise, there's a chance we might call _initializeVideoGrid twice...It
   // might be better to pull out the verification check into a separate function.
 
@@ -592,7 +592,7 @@ function _onJoinBtnClick(e) {
 function _onHangupBtnClick(e) {
   console.log("_onHangupBtnClick");
 
-  // TODO: Implement this function
+  // TODO(5): Implement this function
 
   // _leaveRoom(roomId);
 }
