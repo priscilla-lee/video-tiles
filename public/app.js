@@ -14,6 +14,10 @@ const COLORS = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
   FAR:      "#4178a4", // 45%
   FARTHEST: "#2c506d"  // 30%
 }
+const RESPONSE = {
+  SUCCESS: 0,
+  ERROR: -1
+}
 const MAX_BITRATE = 250000;
 const SCALE_RESOLUTION_DOWN_BY = 2;
 const NUM_ROWS = 6;
@@ -282,50 +286,44 @@ function _waitForOtherUsers(roomDoc) {
 
 /*******************************************************************************
  * Create a new room (first user on the video call)
- *
- * TODO: Factor out any repeated code in _createRoom and _joinRoom.
  ******************************************************************************/
 async function _createRoom(roomName) {
   console.log("_createRoom");
 
   // Verify that this room name isn't being used already
   roomsCollection = await firebase.firestore().collection('rooms');
-  const roomIds = await roomsCollection.doc('roomIds').get();
+  const roomIdsDoc = roomsCollection.doc('roomIds');
+  const roomIds = await roomIdsDoc.get();
   if (roomIds.data()) {
     const roomNameToId = roomIds.data().roomNameToId;
     if (Object.keys(roomNameToId).includes(roomName)) {
-      console.log("This room name is already being used!");
-      return;
+      return RESPONSE.ERROR;
     }
   }
 
-  // Grab a roomId, and add it to the list
+  // Set the room ID
   if (!roomIds.data()) {
     roomId = 'ROOM0';
-    roomsCollection.doc('roomIds').set({ 
-      nextRoomNum: 1, 
-      roomNameToId: { [roomName]: roomId } 
-    });
+    roomIdsDoc.set({ nextRoomNum: 1, roomNameToId: { [roomName]: roomId } });
   } else {
     const roomNum = roomIds.data().nextRoomNum;
     roomId = 'ROOM' + roomNum;
-    roomNameToIdRoomName = 'roomNameToId.' + roomName
-    roomsCollection.doc('roomIds').update({ 
-      nextRoomNum: roomNum + 1, 
-      [roomNameToIdRoomName]: roomId
-    });
+    roomIdsDoc.update({ 
+      nextRoomNum: roomNum + 1, ['roomNameToId.' + roomName]: roomId });
   }
 
-  // Grab a user ID, and add it to the list
+  // Set a user ID
   const roomDoc = roomsCollection.doc(roomId);
   localUserId = 'USER0';
   roomDoc.set({ roomName: roomName, nextUserNum: 1, userIds: [localUserId] });
 
+  // Set initial coordinates
+  localCoordinates = { row: 0, col: 0 };
+  allCoordinates[localUserId] = localCoordinates;
+
   // Update user settings
   const userSettings = roomDoc.collection('userSettings');
   userSettings.doc('userNames').set({ USER0: localUserName });
-  localCoordinates = { row: 0, col: 0 };
-  allCoordinates[localUserId] = localCoordinates;
   userSettings.doc('USER0coordinates').set(localCoordinates);
 
   // Display the user's local video
@@ -335,6 +333,7 @@ async function _createRoom(roomName) {
   localVideo.srcObject = localStream;
 
   _waitForOtherUsers(roomDoc);
+  return RESPONSE.SUCCESS;
 }
 
 /*******************************************************************************
@@ -343,17 +342,18 @@ async function _createRoom(roomName) {
 async function _joinRoom(roomName) {
   console.log("_joinRoom");
 
-  // Grab the roomId
+  // Verify that this room name exists
   roomsCollection = await firebase.firestore().collection('rooms');
   const roomIds = await roomsCollection.doc('roomIds').get();
   const roomNameToId = roomIds.data().roomNameToId;
   if (!roomIds.data() || !Object.keys(roomNameToId).includes(roomName)) {
-    console.log("This room name doesn't exist!");
-    return;
+    return RESPONSE.ERROR;
   }
+
+  // Set the room ID
   roomId = roomNameToId[roomName];
 
-  // Grab a user ID, and add it to the list
+  // Set a user ID
   const roomDoc = roomsCollection.doc(roomId);
   const room = await roomDoc.get();
   const localUserNum = room.data().nextUserNum;
@@ -363,7 +363,7 @@ async function _joinRoom(roomName) {
     userIds: firebase.firestore.FieldValue.arrayUnion(localUserId)
   });
 
-  // Find available coordinates
+  // Select initial coordinates
   const userSettings = roomDoc.collection('userSettings');
   const userSettingsSnapshot = await userSettings.get();
   localCoordinates = _getAvailableTile(
@@ -391,6 +391,7 @@ async function _joinRoom(roomName) {
   }
 
   _waitForOtherUsers(roomDoc);
+  return RESPONSE.SUCCESS;
 }
 
 /*******************************************************************************
@@ -543,12 +544,18 @@ function _onCreateBtnClick(e) {
   // TODO: Add a validation error message (e.g. "that room name is already being 
   // used") using Bootstrap alert components.
 
-  _initializeVideoGrid();
-  _createRoom(roomName);
+  // TODO: Only initialize the video grid if we get a RESPONSE.SUCCESS. 
+  // Otherwise, there's a chance we might call _initializeVideoGrid twice...It
+  // might be better to pull out the verification check into a separate function.
 
-  // Display the room page
-  document.querySelector('#homePage').style.display = "none";
-  document.querySelector('#roomPage').style.display = "block";
+  _initializeVideoGrid();
+  if (_createRoom(roomName) == RESPONSE.ERROR) {
+    console.log("This room name is already being used!");
+  } else {
+    // Display the room page
+    document.querySelector('#homePage').style.display = "none";
+    document.querySelector('#roomPage').style.display = "block";
+  }
 }
 
 /*******************************************************************************
@@ -565,12 +572,18 @@ function _onJoinBtnClick(e) {
   // TODO: Add a validation error message (e.g. "that room name doesn't exist")
   // using Bootstrap alert components.
 
-  _initializeVideoGrid();
-  _joinRoom(roomName);
+  // TODO: Only initialize the video grid if we get a RESPONSE.SUCCESS. 
+  // Otherwise, there's a chance we might call _initializeVideoGrid twice...It
+  // might be better to pull out the verification check into a separate function.
 
-  // Display the room page
-  document.querySelector('#homePage').style.display = "none";
-  document.querySelector('#roomPage').style.display = "block";
+  _initializeVideoGrid();
+  if (_joinRoom(roomName) == RESPONSE.ERROR) {
+    console.log("This room name doesn't exist!");
+  } else {
+    // Display the room page
+    document.querySelector('#homePage').style.display = "none";
+    document.querySelector('#roomPage').style.display = "block";
+  }
 }
 
 /*******************************************************************************
