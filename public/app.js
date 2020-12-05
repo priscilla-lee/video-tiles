@@ -16,7 +16,8 @@ const COLORS = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
 }
 const RESPONSE = {
   SUCCESS: 0,
-  ERROR: -1
+  ROOM_DOESNT_EXIST_ERROR: 1,
+  ROOM_ALREADY_EXISTS_ERROR: 2
 }
 const MAX_BITRATE = 250000;
 const SCALE_RESOLUTION_DOWN_BY = 2;
@@ -34,6 +35,13 @@ let localStream = null;
 let allCoordinates = {};
 let peerConnections = {};
 let remoteStreams = {};
+
+/*******************************************************************************
+ * Just a shortcut helper function to query select DOM elements.
+ ******************************************************************************/
+function _dom(querySelector) {
+  return document.querySelector(querySelector);
+}
 
 /*******************************************************************************
  * Returns true if the video tile specified by the given coordinates is
@@ -141,8 +149,8 @@ function _downscaleVideo(peerConnection) {
 function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
 
-  // TODO(7): Add a tiny pop up notification when a user joins (using a Bootstrap
-  // toast component).
+  // TODO(7): Add a tiny pop up notification when a user joins (using a 
+  // Bootstrap toast component).
 
   let peerConnection = 
     _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId);
@@ -297,7 +305,7 @@ async function _createRoom(roomName) {
   if (roomIds.data()) {
     const roomNameToId = roomIds.data().roomNameToId;
     if (Object.keys(roomNameToId).includes(roomName)) {
-      return RESPONSE.ERROR;
+      return RESPONSE.ROOM_ALREADY_EXISTS_ERROR;
     }
   }
 
@@ -327,6 +335,7 @@ async function _createRoom(roomName) {
   userSettings.doc('USER0coordinates').set(localCoordinates);
 
   // Display the user's local video
+  _initializeVideoGrid();
   const localVideo = videoGrid[0][0];
   localVideo.setAttribute("id", "localVideo");
   localVideo.muted = true;
@@ -347,7 +356,7 @@ async function _joinRoom(roomName) {
   const roomIds = await roomsCollection.doc('roomIds').get();
   const roomNameToId = roomIds.data().roomNameToId;
   if (!roomIds.data() || !Object.keys(roomNameToId).includes(roomName)) {
-    return RESPONSE.ERROR;
+    return RESPONSE.ROOM_DOESNT_EXIST_ERROR;
   }
 
   // Set the room ID
@@ -375,6 +384,7 @@ async function _joinRoom(roomName) {
   userSettings.doc(`${localUserId}coordinates`).set(localCoordinates);
 
   // Display the user's local video
+  _initializeVideoGrid();
   const localVideo = videoGrid[localCoordinates.row][localCoordinates.col];
   localVideo.setAttribute("id", "localVideo");
   localVideo.muted = true;
@@ -404,7 +414,7 @@ async function _leaveRoom(roomId) {
 
   return;
 
-  const tracks = document.querySelector('#localVideo').srcObject.getTracks();
+  const tracks = _dom('#localVideo').srcObject.getTracks();
   tracks.forEach(track => {
     track.stop();
   });
@@ -417,13 +427,13 @@ async function _leaveRoom(roomId) {
     peerConnection.close();
   }
 
-  document.querySelector('#localVideo').srcObject = null;
-  document.querySelector('#remoteVideo').srcObject = null;
-  document.querySelector('#cameraBtn').disabled = false;
-  document.querySelector('#joinBtn').disabled = true;
-  document.querySelector('#createBtn').disabled = true;
-  document.querySelector('#hangupBtn').disabled = true;
-  document.querySelector('#currentRoom').innerText = '';
+  _dom('#localVideo').srcObject = null;
+  _dom('#remoteVideo').srcObject = null;
+  _dom('#cameraBtn').disabled = false;
+  _dom('#joinBtn').disabled = true;
+  _dom('#createBtn').disabled = true;
+  _dom('#hangupBtn').disabled = true;
+  _dom('#currentRoom').innerText = '';
 
   // Delete room on hangup
   if (roomId) {
@@ -470,7 +480,7 @@ function _initializeVideoGrid() {
     videoGrid[i] = new Array(NUM_COLS);
   }
 
-  let videoTileGrid = document.querySelector("#videoTileGrid");
+  let videoTileGrid = _dom("#videoTileGrid");
   for (var r = 0; r < NUM_ROWS; r++) {
     for (var c = 0; c < NUM_COLS; c++) {
       // Create a video tile
@@ -501,13 +511,13 @@ function _initializeVideoGrid() {
 async function _onCameraBtnClick(e) {
   console.log("_onCameraBtnClick");
 
-  const userNameInput = document.querySelector('#userNameInput');
-  const roomNameInput = document.querySelector('#roomNameInput');
-  const createBtn = document.querySelector('#createBtn');
-  const joinBtn = document.querySelector('#joinBtn');
+  const userNameInput = _dom('#userNameInput');
+  const roomNameInput = _dom('#roomNameInput');
+  const createBtn = _dom('#createBtn');
+  const joinBtn = _dom('#joinBtn');
 
   // Hide camera button, and enable username and room name input
-  document.querySelector('#cameraBtn').style.display = "none";
+  _dom('#cameraBtn').style.display = "none";
   userNameInput.disabled = false;
   roomNameInput.disabled = false;
 
@@ -527,7 +537,7 @@ async function _onCameraBtnClick(e) {
   // Capture the local stream
   localStream = await navigator.mediaDevices.getUserMedia(
       {video: true, audio: true});
-  document.querySelector('#localVideoPreview').srcObject = localStream;
+  _dom('#localVideoPreview').srcObject = localStream;
 }
 
 /*******************************************************************************
@@ -536,26 +546,24 @@ async function _onCameraBtnClick(e) {
 function _onCreateBtnClick(e) {
   console.log("_onCreateBtnClick");
 
-  localUserName = document.querySelector('#userNameInput').value;
-  roomName = document.querySelector('#roomNameInput').value;
-  document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
-  document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
+  localUserName = _dom('#userNameInput').value;
+  roomName = _dom('#roomNameInput').value;
 
   // TODO(2): Add a validation error message (e.g. "that room name is already 
   // being used") using Bootstrap alert components.
 
-  // TODO(1): Only initialize the video grid if we get a RESPONSE.SUCCESS. 
-  // Otherwise, there's a chance we might call _initializeVideoGrid twice...It
-  // might be better to pull out the verification check into a separate function.
-
-  _initializeVideoGrid();
-  if (_createRoom(roomName) == RESPONSE.ERROR) {
-    console.log("This room name is already being used!");
-  } else {
-    // Display the room page
-    document.querySelector('#homePage').style.display = "none";
-    document.querySelector('#roomPage').style.display = "block";
-  }
+  _createRoom(roomName).then((response) => {
+    if (response == RESPONSE.ROOM_ALREADY_EXISTS_ERROR) {
+      console.log("This room name is already being used! Try a different " +
+        "room name.");
+    } else {
+      // Display the room page
+      _dom('#currentUser').innerText = `User: ${localUserName}`;
+      _dom('#currentRoom').innerText = `Room: ${roomName}`;
+      _dom('#homePage').style.display = "none";
+      _dom('#roomPage').style.display = "block";
+    }
+  });
 }
 
 /*******************************************************************************
@@ -564,26 +572,23 @@ function _onCreateBtnClick(e) {
 function _onJoinBtnClick(e) {
   console.log("_onJoinBtnClick");
 
-  localUserName = document.querySelector('#userNameInput').value;
-  roomName = document.querySelector('#roomNameInput').value;
-  document.querySelector('#currentUser').innerText = `User: ${localUserName}`;
-  document.querySelector('#currentRoom').innerText = `Room: ${roomName}`;
+  localUserName = _dom('#userNameInput').value;
+  roomName = _dom('#roomNameInput').value;
 
   // TODO(2): Add a validation error message (e.g. "that room name doesn't 
   // exist") using Bootstrap alert components.
 
-  // TODO(1): Only initialize the video grid if we get a RESPONSE.SUCCESS. 
-  // Otherwise, there's a chance we might call _initializeVideoGrid twice...It
-  // might be better to pull out the verification check into a separate function.
-
-  _initializeVideoGrid();
-  if (_joinRoom(roomName) == RESPONSE.ERROR) {
-    console.log("This room name doesn't exist!");
-  } else {
-    // Display the room page
-    document.querySelector('#homePage').style.display = "none";
-    document.querySelector('#roomPage').style.display = "block";
-  }
+  _joinRoom(roomName).then((response) => {
+    if (response == RESPONSE.ROOM_DOESNT_EXIST_ERROR) {
+      console.log("This room name doesn't exist! Try a different room name.");
+    } else {
+      // Display the room page
+      _dom('#currentUser').innerText = `User: ${localUserName}`;
+      _dom('#currentRoom').innerText = `Room: ${roomName}`;
+      _dom('#homePage').style.display = "none";
+      _dom('#roomPage').style.display = "block";
+    }
+  });
 }
 
 /*******************************************************************************
@@ -598,7 +603,7 @@ function _onHangupBtnClick(e) {
 }
 
 // Add all the button click event listeners
-document.querySelector('#cameraBtn').onclick = _onCameraBtnClick;
-document.querySelector('#createBtn').onclick = _onCreateBtnClick;
-document.querySelector('#joinBtn').onclick = _onJoinBtnClick;
-document.querySelector('#hangupBtn').onclick = _onHangupBtnClick;
+_dom('#cameraBtn').onclick = _onCameraBtnClick;
+_dom('#createBtn').onclick = _onCreateBtnClick;
+_dom('#joinBtn').onclick = _onJoinBtnClick;
+_dom('#hangupBtn').onclick = _onHangupBtnClick;
