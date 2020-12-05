@@ -631,6 +631,9 @@ function _onJoinBtnClick(e) {
 function _onHangupBtnClick(e) {
   console.log("_onHangupBtnClick");
 
+  alert("The \"Leave Room\" button doesn't work yet :( " +
+    "Just exit the tab for now.");
+
   // TODO(5): Implement this function
 
   // _leaveRoom(roomId);

@@ -66,11 +66,22 @@
 <!-- The room page that the user sees once they create or join a room -->
 <div id="roomPage" style="display: none;">
     <div id="videoTileGrid"></div>
-    <p id="currentUser"></p>
-    <p id="currentRoom"></p>
-    <button id="hangupBtn" type="button" class="btn btn-danger">
-        Leave Room
-    </button>
+    <div id="bottomBarShadow"></div>
+    <div id="bottomBar">
+        <div class="row">
+            <div class="col-4">
+                <p id="currentUser" class="h5"></p>
+            </div>
+            <div class="col-4" style="text-align: center;">
+                <button id="hangupBtn" type="button" class="btn btn-danger">
+                    Leave Room
+                </button>
+            </div>
+            <div class="col-4" style="text-align: right;">
+                <p id="currentRoom" class="h5"></p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="app.js"></script>
