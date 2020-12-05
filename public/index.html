@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>VideoTiles</title>
 
+    <!-- TODO(8) Download backup copies of these dependencies if possible -->
+
     <!-- Material Design CSS and JS -->
     <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
     <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
@@ -39,7 +41,7 @@
         </div>
         <div class="col-4">
             <h1 class="display-4">VideoTiles</h1>
-            <form style="padding-top: 30px;">
+            <form style="padding-top: 20px;">
                 <div class="form-group">
                     <label for="userNameInput">Username</label>
                     <input type="text" class="form-control" id="userNameInput" disabled>
@@ -48,11 +50,14 @@
                     <label for="roomNameInput">Room name</label>
                     <input type="text" class="form-control" id="roomNameInput" disabled>
                 </div>
-                <div class="btn-group" role="group" style="width: 100%; padding-top: 10px;">
+                <div class="btn-group" role="group" style="width: 100%; padding: 10px 0 20px;">
                     <button type="button" id="createBtn" class="btn btn-success" disabled>Create Room</button>
                     <button type="button" id="joinBtn" class="btn btn-info" disabled>Join Room</button>
                 </div>
             </form>
+            <div id="createOrJoinError" class="alert alert-danger" 
+                 role="alert" style="display: none;">
+            </div>
         </div>
         <div class="col-1"></div>
     </div>

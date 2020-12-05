@@ -36,6 +36,8 @@ let allCoordinates = {};
 let peerConnections = {};
 let remoteStreams = {};
 
+// TODO(9): Use ' or " consistently.
+
 /*******************************************************************************
  * Just a shortcut helper function to query select DOM elements.
  ******************************************************************************/
@@ -549,13 +551,11 @@ function _onCreateBtnClick(e) {
   localUserName = _dom('#userNameInput').value;
   roomName = _dom('#roomNameInput').value;
 
-  // TODO(2): Add a validation error message (e.g. "that room name is already 
-  // being used") using Bootstrap alert components.
-
   _createRoom(roomName).then((response) => {
     if (response == RESPONSE.ROOM_ALREADY_EXISTS_ERROR) {
-      console.log("This room name is already being used! Try a different " +
-        "room name.");
+      _dom("#createOrJoinError").style.display = 'block'
+      _dom("#createOrJoinError").innerText = `"${roomName}" is already ` +
+        'being used! Try a different room name.';
     } else {
       // Display the room page
       _dom('#currentUser').innerText = `User: ${localUserName}`;
@@ -575,12 +575,11 @@ function _onJoinBtnClick(e) {
   localUserName = _dom('#userNameInput').value;
   roomName = _dom('#roomNameInput').value;
 
-  // TODO(2): Add a validation error message (e.g. "that room name doesn't 
-  // exist") using Bootstrap alert components.
-
   _joinRoom(roomName).then((response) => {
     if (response == RESPONSE.ROOM_DOESNT_EXIST_ERROR) {
-      console.log("This room name doesn't exist! Try a different room name.");
+      _dom("#createOrJoinError").style.display = 'block'
+      _dom("#createOrJoinError").innerText = `"${roomName}" doesn't exist! ` +
+        "Try a different room name.";
     } else {
       // Display the room page
       _dom('#currentUser').innerText = `User: ${localUserName}`;
