@@ -41,8 +41,8 @@
 div#videoTileGrid {
     background: white;
     display: grid;
-    grid-template-rows: repeat(6, 200px);
-    grid-template-columns: repeat(12, 200px);
+    grid-template-rows: repeat(6, 180px);
+    grid-template-columns: repeat(12, 180px);
 }
 
 div#videoTileGrid > .videoTile {
@@ -57,8 +57,8 @@ div#videoTileGrid > .videoTile {
 div#videoTileGrid > .videoTile > video {
     background: transparent;
     display: block;
-    height: 180px;
-    width: 180px;
+    height: 160px;
+    width: 160px;
     object-fit: cover;
     border-radius: 5px;
 }

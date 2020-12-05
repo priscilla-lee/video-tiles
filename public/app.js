@@ -8,7 +8,19 @@ const CONFIGURATION = {
     ],
   }]
 };
-const COLORS = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
+const PROXIMITY = {
+  NEAREST:  2,
+  NEAR:     4,
+  FAR:      6,
+  FARTHEST: 8
+}
+const VOLUME = {
+  NEAREST:  1.0,
+  NEAR:     0.5,
+  FAR:      0.1,
+  FARTHEST: 0.0
+}
+const COLOR = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
   NEAREST:  "#a4c2db", // 75%
   NEAR:     "#6d9dc5", // 60%
   FAR:      "#4178a4", // 45%
@@ -29,6 +41,7 @@ let roomsCollection = null;
 let roomId = null;
 let roomName = null;
 let videoGrid = null;
+let videoTileGrid = null;
 let localUserId = null;
 let localUserName = null;
 let localStream = null;
@@ -37,6 +50,8 @@ let peerConnections = {};
 let remoteStreams = {};
 
 // TODO(9): Use ' or " consistently.
+
+// TODO(10): Test on Firefox.
 
 /*******************************************************************************
  * Just a shortcut helper function to query select DOM elements.
@@ -84,7 +99,79 @@ function _getAvailableTile(userCoordinates) {
 }
 
 /*******************************************************************************
- * Create a peer connection between the local and remote users
+ * Initialize the grid of video elements, each inside a video tile.
+ ******************************************************************************/
+function _initializeVideoGrid() {
+  console.log("_initializeVideoGrid");
+
+  // Create the grid of videos
+  videoGrid = [];
+  videoTileGrid = [];
+  for (var i = 0; i < NUM_ROWS; i++) {
+    videoGrid[i] = new Array(NUM_COLS);
+    videoTileGrid[i] = new Array(NUM_COLS);
+  }
+
+  const videoTileGridDiv = _dom("#videoTileGrid");
+  for (var r = 0; r < NUM_ROWS; r++) {
+    for (var c = 0; c < NUM_COLS; c++) {
+      // Create a video tile
+      let videoTile = document.createElement("div");
+      videoTile.setAttribute("class", "videoTile");
+      videoTile.onclick = (() => {
+        var _r = r;
+        var _c = c;
+        return () => _onVideoTileClick(_r, _c);
+      })();
+
+      // Create a video element
+      let video = document.createElement("video");
+      video.autoplay = true;
+      video.playsinline = true;
+
+      // Put it all together
+      videoGrid[r][c] = video;
+      videoTileGrid[r][c] = videoTile;
+      videoTile.appendChild(video);
+      videoTileGridDiv.appendChild(videoTile);
+    }
+  }
+}
+
+/*******************************************************************************
+ * Set the volume and color of each video in the grid based on its proximity to
+ * the local user's current location.
+ ******************************************************************************/
+function _setVideoGridVolumeAndColor(localUserCoordinates) {
+  console.log("_setVideoGridVolumeAndColor");
+
+  for (var r = 0; r < NUM_ROWS; r++) {
+    for (var c = 0; c < NUM_COLS; c++) {
+      const dr = Math.abs(localUserCoordinates.row - r);
+      const dc = Math.abs(localUserCoordinates.col - c);
+      let proximityBasedColor;
+      let proximityBasedVolume;
+      if (dr < PROXIMITY.NEAREST && dc < PROXIMITY.NEAREST) {
+        proximityBasedColor = COLOR.NEAREST;
+        proximityBasedVolume = VOLUME.NEAREST;
+      } else if (dr < PROXIMITY.NEAR && dc < PROXIMITY.NEAR) {
+        proximityBasedColor = COLOR.NEAR;
+        proximityBasedVolume = VOLUME.NEAR;
+      } else if (dr < PROXIMITY.FAR && dc < PROXIMITY.FAR) {
+        proximityBasedColor = COLOR.FAR;
+        proximityBasedVolume = VOLUME.FAR;
+      } else {
+        proximityBasedColor = COLOR.FARTHEST;
+        proximityBasedVolume = VOLUME.FARTHEST;
+      }
+      videoTileGrid[r][c].style.background = proximityBasedColor;
+      videoGrid[r][c].volume = proximityBasedVolume;
+    }
+  }
+}
+
+/*******************************************************************************
+ * Create a peer connection between the local and remote users.
  ******************************************************************************/
 function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
   console.log("_createPeerConnection");
@@ -131,7 +218,8 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
 }
 
 /*******************************************************************************
- * Downscale the video resolution and bitrate before sending video track to peer
+ * Downscale the video resolution and bitrate before sending the local user's
+ * video track to this peer.
  ******************************************************************************/
 function _downscaleVideo(peerConnection) {
   console.log("_downscaleVideo");
@@ -146,7 +234,7 @@ function _downscaleVideo(peerConnection) {
 }
 
 /*******************************************************************************
- * Respond to the given remote user joining the call
+ * Respond to the given remote user joining the call.
  ******************************************************************************/
 function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
@@ -171,7 +259,7 @@ function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
 }
 
 /*******************************************************************************
- * Respond to the given remote user moving video tile locations
+ * Respond to the given remote user moving video tile locations.
  ******************************************************************************/
 function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
   console.log("_onUserMove");
@@ -185,11 +273,11 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
   videoGrid[newCoordinates.row][newCoordinates.col].srcObject = 
     remoteStreams[remoteUserId];
 
-  // TODO(4): Update the remote user's audio volume.
+  _setVideoGridVolumeAndColor(allCoordinates[localUserId]);
 }
 
 /*******************************************************************************
- * Respond to the given remote user exiting the call
+ * Respond to the given remote user exiting the call.
  ******************************************************************************/
 function _onUserExit(remoteUserId) {
   console.log("_onUserExit");
@@ -198,7 +286,7 @@ function _onUserExit(remoteUserId) {
 }
 
 /*******************************************************************************
- * Initiate a connection with the given user in the call
+ * Initiate a connection with the given user in the call.
  ******************************************************************************/
 function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_doUserJoin");
@@ -223,7 +311,7 @@ function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
 }
 
 /*******************************************************************************
- * Move video tile locations, and broadcast the update to all users in the call
+ * Move video tile locations, and broadcast the update to all users in the call.
  ******************************************************************************/
 function _doUserMove(newCoordinates) {
   console.log("_doUserMove");
@@ -244,13 +332,11 @@ function _doUserMove(newCoordinates) {
   newVideo.muted = true;
   newVideo.setAttribute("id", "localVideo");
 
-  // TODO(4): Update the volume of all the remote users' audio
-
-  // TODO(3): Update the colors of all the video tiles
+  _setVideoGridVolumeAndColor(newCoordinates);
 }
 
 /*******************************************************************************
- * Terminate the connection with the given user in the call
+ * Terminate the connection with the given user in the call.
  ******************************************************************************/
 function _doUserExit(remoteUserId) {
   console.log("_doUserExit");
@@ -259,7 +345,7 @@ function _doUserExit(remoteUserId) {
 }
 
 /*******************************************************************************
- * Wait for other user(s) to join the room, move tiles, or leave the room
+ * Wait for other user(s) to join the room, move tiles, or leave the room.
  ******************************************************************************/
 function _waitForOtherUsers(roomDoc) {
   console.log("_waitForOtherUsers");
@@ -295,7 +381,7 @@ function _waitForOtherUsers(roomDoc) {
 }
 
 /*******************************************************************************
- * Create a new room (first user on the video call)
+ * Create a new room (first user on the video call).
  ******************************************************************************/
 async function _createRoom(roomName) {
   console.log("_createRoom");
@@ -328,7 +414,7 @@ async function _createRoom(roomName) {
   roomDoc.set({ roomName: roomName, nextUserNum: 1, userIds: [localUserId] });
 
   // Set initial coordinates
-  localCoordinates = { row: 0, col: 0 };
+  const localCoordinates = { row: 0, col: 0 };
   allCoordinates[localUserId] = localCoordinates;
 
   // Update user settings
@@ -338,6 +424,7 @@ async function _createRoom(roomName) {
 
   // Display the user's local video
   _initializeVideoGrid();
+  _setVideoGridVolumeAndColor(localCoordinates);
   const localVideo = videoGrid[0][0];
   localVideo.setAttribute("id", "localVideo");
   localVideo.muted = true;
@@ -348,7 +435,7 @@ async function _createRoom(roomName) {
 }
 
 /*******************************************************************************
- * Join a room (initiate peer connections with all the users in the room)
+ * Join a room (initiate peer connections with all the users in the room).
  ******************************************************************************/
 async function _joinRoom(roomName) {
   console.log("_joinRoom");
@@ -377,7 +464,7 @@ async function _joinRoom(roomName) {
   // Select initial coordinates
   const userSettings = roomDoc.collection('userSettings');
   const userSettingsSnapshot = await userSettings.get();
-  localCoordinates = _getAvailableTile(
+  const localCoordinates = _getAvailableTile(
     userSettingsSnapshot.docs.filter(doc => doc.id.includes("coordinates")));
   allCoordinates[localUserId] = localCoordinates;
 
@@ -387,6 +474,7 @@ async function _joinRoom(roomName) {
 
   // Display the user's local video
   _initializeVideoGrid();
+  _setVideoGridVolumeAndColor(localCoordinates);
   const localVideo = videoGrid[localCoordinates.row][localCoordinates.col];
   localVideo.setAttribute("id", "localVideo");
   localVideo.muted = true;
@@ -407,7 +495,7 @@ async function _joinRoom(roomName) {
 }
 
 /*******************************************************************************
- * Leave the room (terminate peer connections with all the users in the room)
+ * Leave the room (terminate peer connections with all the users in the room).
  ******************************************************************************/
 async function _leaveRoom(roomId) {
   console.log("_leaveRoom");
@@ -455,60 +543,7 @@ async function _leaveRoom(roomId) {
 }
 
 /*******************************************************************************
- * On videoTile click, update the local user's location on the tile grid.
- ******************************************************************************/
-function _onVideoTileClick(row, col) {
-  console.log("_onVideoTileClick");
-
-  // TODO(6): Add another step here (like a "Move here" button).
-
-  const coordinates = {row: row, col: col};
-  if (_isTileAvailable(coordinates)) {
-    _doUserMove(coordinates);
-  } else {
-    console.log("That tile is already occupied!");
-  }
-}
-
-/*******************************************************************************
- * Initialize the grid of video elements, each inside a video tile
- ******************************************************************************/
-function _initializeVideoGrid() {
-  console.log("_initializeVideoGrid");
-
-  // Create the grid of videos
-  videoGrid = [];
-  for (var i = 0; i < NUM_ROWS; i++) {
-    videoGrid[i] = new Array(NUM_COLS);
-  }
-
-  let videoTileGrid = _dom("#videoTileGrid");
-  for (var r = 0; r < NUM_ROWS; r++) {
-    for (var c = 0; c < NUM_COLS; c++) {
-      // Create a video tile
-      let videoTile = document.createElement("div");
-      videoTile.setAttribute("class", "videoTile");
-      videoTile.onclick = (() => { 
-        var _r = r;
-        var _c = c;
-        return () => _onVideoTileClick(_r, _c);
-      })();
-
-      // Create a video element
-      let video = document.createElement("video");
-      video.autoplay = true;
-      video.playsinline = true;
-
-      // Put it all together
-      videoGrid[r][c] = video;
-      videoTile.appendChild(video);
-      videoTileGrid.appendChild(videoTile);
-    }
-  }
-}
-
-/*******************************************************************************
- * On cameraBtn click, open user media
+ * On cameraBtn click, open user media.
  ******************************************************************************/
 async function _onCameraBtnClick(e) {
   console.log("_onCameraBtnClick");
@@ -599,6 +634,22 @@ function _onHangupBtnClick(e) {
   // TODO(5): Implement this function
 
   // _leaveRoom(roomId);
+}
+
+/*******************************************************************************
+ * On videoTile click, update the local user's location on the tile grid.
+ ******************************************************************************/
+function _onVideoTileClick(row, col) {
+  console.log("_onVideoTileClick");
+
+  // TODO(6): Add another step here (like a "Move here" button).
+
+  const coordinates = {row: row, col: col};
+  if (_isTileAvailable(coordinates)) {
+    _doUserMove(coordinates);
+  } else {
+    console.log("That tile is already occupied!");
+  }
 }
 
 // Add all the button click event listeners
