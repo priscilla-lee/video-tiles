@@ -54,7 +54,7 @@ let nextToastNum = 0;
 
 // TODO(10): Test on Firefox.
 
-// TODO(12): Let users move around using arrow keys.
+// TODO(12): Better logging (log parameters too).
 
 // TODO(13): Apply JS tips/tricks/best practices from Fireship's YouTube
 // channel.
@@ -198,7 +198,10 @@ function _initializeVideoGrid() {
       videoTile.setAttribute('class', 'videoTile');
       videoTile.onclick = (() => {
         var _r = r; var _c = c; var _moveHere = moveHere; // Closure vars
-        return () => _onVideoTileClick(_r, _c, _moveHere);
+        return () => {
+          _moveHere.style.display = 'none';
+          _onVideoTileClick(_r, _c)
+        };
       })();
 
       // Display the "Move here" overlay on hover.
@@ -228,6 +231,26 @@ function _initializeVideoGrid() {
       videoTileGridDiv.appendChild(videoTile);
     }
   }
+
+  // Listen to arrow key presses to move the local user's coordinates.
+  document.onkeydown = (e) => {
+    const {row, col} = allCoordinates[localUserId];
+
+    switch (e.code) {
+      case 'ArrowUp':
+        _onVideoTileClick(row - 1, col);
+        break;
+      case 'ArrowDown':
+        _onVideoTileClick(row + 1, col);
+        break;
+      case 'ArrowLeft':
+        _onVideoTileClick(row, col - 1);
+        break;
+      case 'ArrowRight':
+        _onVideoTileClick(row, col + 1);
+        break;
+    }
+  };
 }
 
 /*******************************************************************************
@@ -755,13 +778,14 @@ async function _onHangupBtnClick(e) {
 /*******************************************************************************
  * On videoTile click, update the local user's location on the tile grid.
  ******************************************************************************/
-function _onVideoTileClick(row, col, moveHere) {
+function _onVideoTileClick(row, col) {
   console.log('_onVideoTileClick');
 
   const coordinates = {row: row, col: col};
-  if (_isTileAvailable(coordinates)) {
+  if (row < 0 || row >= NUM_ROWS || col < 0 || col >= NUM_COLS) {
+    console.log('That tile is out of bounds!');
+  } else if (_isTileAvailable(coordinates)) {
     _doUserMove(coordinates);
-    moveHere.style.display = 'none';
   } else {
     console.log('That tile is already occupied!');
   }
