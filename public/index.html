@@ -56,7 +56,7 @@
                     <label for="roomNameInput">Room name</label>
                     <input type="text" class="form-control" id="roomNameInput" disabled>
                 </div>
-                <div class="btn-group" role="group" style="width: 100%; padding: 10px 0 20px;">
+                <div id="createOrJoin" class="btn-group" role="group">
                     <button type="button" id="createBtn" class="btn btn-success" disabled>Create Room</button>
                     <button type="button" id="joinBtn" class="btn btn-info" disabled>Join Room</button>
                 </div>
@@ -72,6 +72,7 @@
 <!-- The room page that the user sees once they create or join a room -->
 <div id="roomPage" style="display: none;">
     <div id="videoTileGrid"></div>
+    <div id="toastContainer"></div>
     <div id="bottomBarShadow"></div>
     <div id="bottomBar">
         <div class="row">

@@ -21,10 +21,12 @@ const VOLUME = {
   FARTHEST: 0.0
 }
 const COLOR = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
-  NEAREST:  "#a4c2db", // 75%
-  NEAR:     "#6d9dc5", // 60%
-  FAR:      "#4178a4", // 45%
-  FARTHEST: "#2c506d"  // 30%
+  NEAREST:     "#a4c2db", // 75%
+  NEAR:        "#6d9dc5", // 60%
+  FAR:         "#4178a4", // 45%
+  FARTHEST:    "#2c506d", // 30%
+  TOAST_JOIN:  "rgba(220, 255, 210, 0.9)", // green
+  TOAST_LEAVE: "rgba(255, 220, 220, 0.9)"  // red
 }
 const RESPONSE = {
   SUCCESS: 0,
@@ -48,6 +50,7 @@ let localStream = null;
 let allCoordinates = {};
 let peerConnections = {};
 let remoteStreams = {};
+let nextToastNum = 0;
 
 // TODO(9): Use ' or " consistently.
 
@@ -149,6 +152,28 @@ function _setVideoGridVolumeAndColor(localUserCoordinates) {
 }
 
 /*******************************************************************************
+ * Add a Bootstrap toast component with the given message.
+ ******************************************************************************/
+function _addToast(toastMessage, toastColor) {
+  const toastNum = nextToastNum;
+  nextToastNum += 1;
+
+  // Create Bootstrap toast component
+  const toast = document.createElement("div");
+  toast.setAttribute('class', 'toast');
+  toast.setAttribute('id', `toast${toastNum}`);
+  toast.setAttribute('role', 'alert');
+  toast.setAttribute('data-delay', '2000'); // Fade after 2 seconds
+  toast.style.background = toastColor;
+  toast.style.fontWeight = 'bold';
+  toast.innerHTML = `<div class="toast-body">${toastMessage}</div>`;
+
+  // Add to the toast container and show
+  _dom('#toastContainer').appendChild(toast);
+  $(`#toast${toastNum}`).toast('show');
+}
+
+/*******************************************************************************
  * Initialize the grid of video elements, each inside a video tile.
  ******************************************************************************/
 function _initializeVideoGrid() {
@@ -182,9 +207,6 @@ function _initializeVideoGrid() {
       videoTile.onmouseenter = (() => {
         var _r = r; var _c = c; var _moveHere = moveHere; // Closure vars
         return () => {
-          console.log({row: _r, col: _c});
-          console.log(videoGrid[_r][_c]);
-          console.log(videoGrid[_r][_c].srcObject);
           if (videoGrid[_r][_c].srcObject == null) {
             _moveHere.style.display = 'flex';
           }
@@ -279,8 +301,8 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
 function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
 
-  // TODO(7): Add a tiny pop up notification when a user joins (using a
-  // Bootstrap toast component).
+  // TODO(7): Show the remote user name, not ID.
+  _addToast(`${remoteUserId} joined the call!`, COLOR.TOAST_JOIN);
 
   let peerConnection = 
     _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId);
@@ -322,8 +344,8 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
 async function _onUserExit(roomDoc, remoteUserId) {
   console.log("_onUserExit");
 
-  // TODO(7): Add a tiny pop up notification when a user exits (using a
-  // Bootstrap toast component).
+  // TODO(7): Show the remote user name, not ID.
+  _addToast(`${remoteUserId} left the call`, COLOR.TOAST_LEAVE);
 
   // Make sure the remote user's coordinates and IDs have been deleted.
   await roomDoc.collection('userSettings')
