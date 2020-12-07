@@ -298,11 +298,13 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
 /*******************************************************************************
  * Respond to the given remote user joining the call.
  ******************************************************************************/
-function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
+async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
 
-  // TODO(7): Show the remote user name, not ID.
-  _addToast(`${remoteUserId} joined the call!`, COLOR.TOAST_JOIN);
+  // Display a brief toast notification that this user joined the call
+  const names = await roomDoc.collection('userSettings').doc('userNames').get();
+  const remoteUserName = names.data()[remoteUserId];
+  _addToast(`${remoteUserName} joined the call!`, COLOR.TOAST_JOIN);
 
   let peerConnection = 
     _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId);
@@ -344,8 +346,10 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
 async function _onUserExit(roomDoc, remoteUserId) {
   console.log("_onUserExit");
 
-  // TODO(7): Show the remote user name, not ID.
-  _addToast(`${remoteUserId} left the call`, COLOR.TOAST_LEAVE);
+  // Display a brief toast notification that this user left the call
+  const names = await roomDoc.collection('userSettings').doc('userNames').get();
+  const remoteUserName = names.data()[remoteUserId];
+  _addToast(`${remoteUserName} left the call`, COLOR.TOAST_LEAVE);
 
   // Make sure the remote user's coordinates and IDs have been deleted.
   await roomDoc.collection('userSettings')
