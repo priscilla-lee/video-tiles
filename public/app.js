@@ -53,6 +53,11 @@ let remoteStreams = {};
 
 // TODO(10): Test on Firefox.
 
+// TODO(12): Let users move around using arrow keys.
+
+// TODO(13): Apply JS tips/tricks/best practices from Fireship's YouTube
+// channel.
+
 /*******************************************************************************
  * Just a shortcut helper function to query select DOM elements.
  ******************************************************************************/
@@ -99,6 +104,50 @@ function _getAvailableTile(userCoordinates) {
 }
 
 /*******************************************************************************
+ * Downscale the video resolution and bitrate before sending the local user's
+ * video track to this peer.
+ ******************************************************************************/
+function _downscaleVideo(peerConnection) {
+  let videoSender = peerConnection.getSenders().find(
+    s => s.track.kind === 'video');
+  let params = videoSender.getParameters();
+  if (!params.encodings) { params.encodings = [{}]; }
+  params.encodings[0].scaleResolutionDownBy = SCALE_RESOLUTION_DOWN_BY;
+  params.encodings[0].maxBitrate = MAX_BITRATE;
+  videoSender.setParameters(params);
+}
+
+/*******************************************************************************
+ * Set the volume and color of each video in the grid based on its proximity to
+ * the local user's current location.
+ ******************************************************************************/
+function _setVideoGridVolumeAndColor(localUserCoordinates) {
+  for (var r = 0; r < NUM_ROWS; r++) {
+    for (var c = 0; c < NUM_COLS; c++) {
+      const dr = Math.abs(localUserCoordinates.row - r);
+      const dc = Math.abs(localUserCoordinates.col - c);
+      let proximityBasedColor;
+      let proximityBasedVolume;
+      if (dr < PROXIMITY.NEAREST && dc < PROXIMITY.NEAREST) {
+        proximityBasedColor = COLOR.NEAREST;
+        proximityBasedVolume = VOLUME.NEAREST;
+      } else if (dr < PROXIMITY.NEAR && dc < PROXIMITY.NEAR) {
+        proximityBasedColor = COLOR.NEAR;
+        proximityBasedVolume = VOLUME.NEAR;
+      } else if (dr < PROXIMITY.FAR && dc < PROXIMITY.FAR) {
+        proximityBasedColor = COLOR.FAR;
+        proximityBasedVolume = VOLUME.FAR;
+      } else {
+        proximityBasedColor = COLOR.FARTHEST;
+        proximityBasedVolume = VOLUME.FARTHEST;
+      }
+      videoTileGrid[r][c].style.background = proximityBasedColor;
+      videoGrid[r][c].volume = proximityBasedVolume;
+    }
+  }
+}
+
+/*******************************************************************************
  * Initialize the grid of video elements, each inside a video tile.
  ******************************************************************************/
 function _initializeVideoGrid() {
@@ -134,38 +183,6 @@ function _initializeVideoGrid() {
       videoTileGrid[r][c] = videoTile;
       videoTile.appendChild(video);
       videoTileGridDiv.appendChild(videoTile);
-    }
-  }
-}
-
-/*******************************************************************************
- * Set the volume and color of each video in the grid based on its proximity to
- * the local user's current location.
- ******************************************************************************/
-function _setVideoGridVolumeAndColor(localUserCoordinates) {
-  console.log("_setVideoGridVolumeAndColor");
-
-  for (var r = 0; r < NUM_ROWS; r++) {
-    for (var c = 0; c < NUM_COLS; c++) {
-      const dr = Math.abs(localUserCoordinates.row - r);
-      const dc = Math.abs(localUserCoordinates.col - c);
-      let proximityBasedColor;
-      let proximityBasedVolume;
-      if (dr < PROXIMITY.NEAREST && dc < PROXIMITY.NEAREST) {
-        proximityBasedColor = COLOR.NEAREST;
-        proximityBasedVolume = VOLUME.NEAREST;
-      } else if (dr < PROXIMITY.NEAR && dc < PROXIMITY.NEAR) {
-        proximityBasedColor = COLOR.NEAR;
-        proximityBasedVolume = VOLUME.NEAR;
-      } else if (dr < PROXIMITY.FAR && dc < PROXIMITY.FAR) {
-        proximityBasedColor = COLOR.FAR;
-        proximityBasedVolume = VOLUME.FAR;
-      } else {
-        proximityBasedColor = COLOR.FARTHEST;
-        proximityBasedVolume = VOLUME.FARTHEST;
-      }
-      videoTileGrid[r][c].style.background = proximityBasedColor;
-      videoGrid[r][c].volume = proximityBasedVolume;
     }
   }
 }
@@ -214,23 +231,23 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
     });
   });
 
+  // (3) Listen for closure of the peer connection.
+  peerConnection.onconnectionstatechange = e => {
+    switch (peerConnection.connectionState) {
+      // This allows us to gracefully remove the remote user if they leave the
+      // call by refreshing the page or exiting their browser tab/window,
+      // instead of clicking their "Leave Room" button.
+      case 'disconnected':
+      case 'failed':
+      case 'closed':
+        // A user has exited the room.
+        if (allCoordinates[remoteUserId]) {
+          _onUserExit(roomDoc, remoteUserId);
+        }
+    }
+  };
+
   return peerConnection;
-}
-
-/*******************************************************************************
- * Downscale the video resolution and bitrate before sending the local user's
- * video track to this peer.
- ******************************************************************************/
-function _downscaleVideo(peerConnection) {
-  console.log("_downscaleVideo");
-
-  let videoSender = peerConnection.getSenders().find(
-    s => s.track.kind === 'video');
-  let params = videoSender.getParameters();
-  if (!params.encodings) { params.encodings = [{}]; }
-  params.encodings[0].scaleResolutionDownBy = SCALE_RESOLUTION_DOWN_BY;
-  params.encodings[0].maxBitrate = MAX_BITRATE;
-  videoSender.setParameters(params);
 }
 
 /*******************************************************************************
@@ -239,7 +256,7 @@ function _downscaleVideo(peerConnection) {
 function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
   console.log("_onUserJoin");
 
-  // TODO(7): Add a tiny pop up notification when a user joins (using a 
+  // TODO(7): Add a tiny pop up notification when a user joins (using a
   // Bootstrap toast component).
 
   let peerConnection = 
@@ -279,10 +296,37 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
 /*******************************************************************************
  * Respond to the given remote user exiting the call.
  ******************************************************************************/
-function _onUserExit(remoteUserId) {
+async function _onUserExit(roomDoc, remoteUserId) {
   console.log("_onUserExit");
 
-  // TODO(5): Implement this function
+  // TODO(7): Add a tiny pop up notification when a user exits (using a
+  // Bootstrap toast component).
+
+  // Make sure the remote user's coordinates and IDs have been deleted.
+  await roomDoc.collection('userSettings')
+    .doc(`${remoteUserId}coordinates`).delete();
+  roomDoc.update({
+    userIds: firebase.firestore.FieldValue.arrayRemove(remoteUserId),
+  });
+
+  // Remove the remote video.
+  const remoteCoordinates = allCoordinates[remoteUserId];
+  delete allCoordinates[remoteUserId];
+  if (remoteCoordinates) {
+    videoGrid[remoteCoordinates.row][remoteCoordinates.col].srcObject = null;
+  }
+
+  // Stop the remote stream.
+  if (remoteStreams[remoteUserId]) {
+    remoteStreams[remoteUserId].getTracks().forEach(t => t.stop());
+    delete remoteStreams[remoteUserId];
+  }
+
+  // Close the peer connection.
+  if (peerConnections[remoteUserId]) {
+    peerConnections[remoteUserId].close();
+    delete peerConnections[remoteUserId];
+  }
 }
 
 /*******************************************************************************
@@ -336,12 +380,29 @@ function _doUserMove(newCoordinates) {
 }
 
 /*******************************************************************************
- * Terminate the connection with the given user in the call.
+ * Terminate the connections with all the users in the call.
  ******************************************************************************/
-function _doUserExit(remoteUserId) {
+function _doUserExit() {
   console.log("_doUserExit");
 
-  // TODO(5): Implement this function
+  // Stop the local stream.
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+  }
+
+  // Stop all remote streams.
+  for (var id in remoteStreams) {
+    if (remoteStreams[id]) {
+      remoteStreams[id].getTracks().forEach(t => t.stop());
+    }
+  }
+
+  // Close all peer connections.
+  for (var id in peerConnections) {
+    if (peerConnections[id]) {
+      peerConnections[id].close();
+    }
+  }
 }
 
 /*******************************************************************************
@@ -356,10 +417,6 @@ function _waitForOtherUsers(roomDoc) {
         // A user has joined the room
         const remoteUserId = change.doc.id.substring(2);
         _onUserJoin(roomDoc, change.doc.ref, remoteUserId);
-      } else if (change.type === 'removed') {
-        // A user has exited the room
-        const remoteUserId = change.doc.id.substring(2);
-        _onUserExit(remoteUserId);
       }
     });
   });
@@ -484,10 +541,12 @@ async function _joinRoom(roomName) {
   const userIds = room.data().userIds;
   for (var i in userIds) {
     const remoteUserId = userIds[i];
-    _doUserJoin(
-      roomDoc,
-      roomDoc.collection(`from${remoteUserId}`).doc(`to${localUserId}`), 
-      remoteUserId);
+    if (remoteUserId !== localUserId) {
+      _doUserJoin(
+        roomDoc,
+        roomDoc.collection(`from${remoteUserId}`).doc(`to${localUserId}`),
+        remoteUserId);
+    }
   }
 
   _waitForOtherUsers(roomDoc);
@@ -500,46 +559,57 @@ async function _joinRoom(roomName) {
 async function _leaveRoom(roomId) {
   console.log("_leaveRoom");
 
-  // TODO(5): Implement this function
+  // Terminate peer connections with all the users in the room.
+   _doUserExit();
+
+  // Delete all the relevant data in Firestore.
+  const roomDoc = roomsCollection.doc(roomId);
+  const room = await roomDoc.get();
+  if (room.data()) {
+    // Must do: delete the user coordinates and user ID.
+    const userSettingsCollection = roomDoc.collection('userSettings');
+    await userSettingsCollection.doc(`${localUserId}coordinates`).delete();
+    roomDoc.update({
+      userIds: firebase.firestore.FieldValue.arrayRemove(localUserId),
+    });
+
+    // Nice to do: delete the user name.
+    const userNamesDoc = userSettingsCollection.doc('userNames');
+    const userNames = await userNamesDoc.get();
+    if (userNames.data()) {
+      const userNamesData = userNames.data();
+      delete userNamesData[localUserId];
+      await userNamesDoc.update(userNamesData);
+    }
+
+    // Nice to do: delete the fromUSER# collection (don't bother deleting all
+    // of the toUSER# collections).
+    const fromUSER = await roomDoc.collection(`from${localUserId}`).get();
+    fromUSER.forEach(async candidate => await candidate.ref.delete());
+
+    // If this is the last user in the room, delete the room entirely.
+    if (room.data().userIds.length == 1) {
+      // Nice to do: delete the room name and room ID.
+      const roomIdsDoc = roomsCollection.doc('roomIds');
+      const roomIds = await roomIdsDoc.get();
+
+      if (roomIds.data()) {
+        const roomNameToId = roomIds.data().roomNameToId;
+        delete roomNameToId[roomName];
+        await roomIdsDoc.update({ roomNameToId : roomNameToId });
+      }
+
+      // Nice to do: delete the ROOM# doc (It isn't possible to recursively
+      // delete the ROOM# doc, nor is it possible to retrieve the list of
+      // subcollections in the doc to manually delete them one-by-one, so this
+      // is the best we can do).
+      const userSettings = await userSettingsCollection.get();
+      userSettings.forEach(async candidate => await candidate.ref.delete());
+      roomDoc.delete();
+    }
+  }
 
   return;
-
-  const tracks = _dom('#localVideo').srcObject.getTracks();
-  tracks.forEach(track => {
-    track.stop();
-  });
-
-  if (remoteStream) {
-    remoteStream.getTracks().forEach(track => track.stop());
-  }
-
-  if (peerConnection) {
-    peerConnection.close();
-  }
-
-  _dom('#localVideo').srcObject = null;
-  _dom('#remoteVideo').srcObject = null;
-  _dom('#cameraBtn').disabled = false;
-  _dom('#joinBtn').disabled = true;
-  _dom('#createBtn').disabled = true;
-  _dom('#hangupBtn').disabled = true;
-  _dom('#currentRoom').innerText = '';
-
-  // Delete room on hangup
-  if (roomId) {
-    const roomRef = roomsCollection.doc(roomId);
-    const calleeCandidates = await roomRef.collection('calleeCandidates').get();
-    calleeCandidates.forEach(async candidate => {
-      await candidate.ref.delete();
-    });
-    const callerCandidates = await roomRef.collection('callerCandidates').get();
-    callerCandidates.forEach(async candidate => {
-      await candidate.ref.delete();
-    });
-    await roomRef.delete();
-  }
-
-  document.location.reload(true);
 }
 
 /*******************************************************************************
@@ -588,7 +658,7 @@ function _onCreateBtnClick(e) {
 
   _createRoom(roomName).then((response) => {
     if (response == RESPONSE.ROOM_ALREADY_EXISTS_ERROR) {
-      _dom("#createOrJoinError").style.display = 'block'
+      _dom("#createOrJoinError").style.display = 'block';
       _dom("#createOrJoinError").innerText = `"${roomName}" is already ` +
         'being used! Try a different room name.';
     } else {
@@ -612,7 +682,7 @@ function _onJoinBtnClick(e) {
 
   _joinRoom(roomName).then((response) => {
     if (response == RESPONSE.ROOM_DOESNT_EXIST_ERROR) {
-      _dom("#createOrJoinError").style.display = 'block'
+      _dom("#createOrJoinError").style.display = 'block';
       _dom("#createOrJoinError").innerText = `"${roomName}" doesn't exist! ` +
         "Try a different room name.";
     } else {
@@ -628,15 +698,11 @@ function _onJoinBtnClick(e) {
 /*******************************************************************************
  * On hangupBtn click, leave the room.
  ******************************************************************************/
-function _onHangupBtnClick(e) {
+async function _onHangupBtnClick(e) {
   console.log("_onHangupBtnClick");
 
-  alert("The \"Leave Room\" button doesn't work yet :( " +
-    "Just exit the tab for now.");
-
-  // TODO(5): Implement this function
-
-  // _leaveRoom(roomId);
+  await _leaveRoom(roomId);
+  document.location.reload(true);
 }
 
 /*******************************************************************************
@@ -645,7 +711,8 @@ function _onHangupBtnClick(e) {
 function _onVideoTileClick(row, col) {
   console.log("_onVideoTileClick");
 
-  // TODO(6): Add another step here (like a "Move here" button).
+  // TODO(6): Add a "Move here" overlay on hover. And also use the
+  // hand pointer cursor on hover for clickable / available tiles.
 
   const coordinates = {row: row, col: col};
   if (_isTileAvailable(coordinates)) {
