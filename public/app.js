@@ -52,8 +52,6 @@ let peerConnections = {};
 let remoteStreams = {};
 let nextToastNum = 0;
 
-// TODO(10): Test on Firefox.
-
 /*******************************************************************************
  * Just a shortcut helper function to query select DOM elements.
  ******************************************************************************/
