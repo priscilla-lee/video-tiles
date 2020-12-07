@@ -89,7 +89,8 @@ function _isTileAvailable(potentialCoordinates) {
 function _getAvailableTile(userCoordinates) {
   for (var i in userCoordinates) {
     const snapshot = userCoordinates[i];
-    allCoordinates[snapshot.id] = snapshot.data();
+    const userId = snapshot.id.substring(0, snapshot.id.length - 11);
+    allCoordinates[userId] = snapshot.data();
   }
 
   // Find the first available tile
@@ -164,13 +165,34 @@ function _initializeVideoGrid() {
   const videoTileGridDiv = _dom("#videoTileGrid");
   for (var r = 0; r < NUM_ROWS; r++) {
     for (var c = 0; c < NUM_COLS; c++) {
+      // Create a "Move here" overlay.
+      let moveHere = document.createElement("div");
+      moveHere.setAttribute("class", "moveHere");
+      moveHere.innerHTML = '<div style="margin: auto;">Move<br>here</div>';
+
       // Create a video tile
       let videoTile = document.createElement("div");
       videoTile.setAttribute("class", "videoTile");
       videoTile.onclick = (() => {
-        var _r = r;
-        var _c = c;
-        return () => _onVideoTileClick(_r, _c);
+        var _r = r; var _c = c; var _moveHere = moveHere; // Closure vars
+        return () => _onVideoTileClick(_r, _c, _moveHere);
+      })();
+
+      // Display the "Move here" overlay on hover.
+      videoTile.onmouseenter = (() => {
+        var _r = r; var _c = c; var _moveHere = moveHere; // Closure vars
+        return () => {
+          console.log({row: _r, col: _c});
+          console.log(videoGrid[_r][_c]);
+          console.log(videoGrid[_r][_c].srcObject);
+          if (videoGrid[_r][_c].srcObject == null) {
+            _moveHere.style.display = 'flex';
+          }
+        };
+      })();
+      videoTile.onmouseleave = (() => {
+        var _moveHere = moveHere; // Closure vars
+        return () => _moveHere.style.display = 'none';
       })();
 
       // Create a video element
@@ -182,6 +204,7 @@ function _initializeVideoGrid() {
       videoGrid[r][c] = video;
       videoTileGrid[r][c] = videoTile;
       videoTile.appendChild(video);
+      videoTile.appendChild(moveHere);
       videoTileGridDiv.appendChild(videoTile);
     }
   }
@@ -708,15 +731,13 @@ async function _onHangupBtnClick(e) {
 /*******************************************************************************
  * On videoTile click, update the local user's location on the tile grid.
  ******************************************************************************/
-function _onVideoTileClick(row, col) {
+function _onVideoTileClick(row, col, moveHere) {
   console.log("_onVideoTileClick");
-
-  // TODO(6): Add a "Move here" overlay on hover. And also use the
-  // hand pointer cursor on hover for clickable / available tiles.
 
   const coordinates = {row: row, col: col};
   if (_isTileAvailable(coordinates)) {
     _doUserMove(coordinates);
+    moveHere.style.display = 'none';
   } else {
     console.log("That tile is already occupied!");
   }

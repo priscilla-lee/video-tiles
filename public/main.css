@@ -54,6 +54,16 @@
     border-radius: 5px;
 }
 
+#videoTileGrid > .videoTile > .moveHere {
+    display: none;
+    cursor: pointer;
+    position: absolute;
+    text-align: center;
+    color: white;
+    height: 180px;
+    width: 180px;
+}
+
 #videoTileGrid > .videoTile > video {
     background: transparent;
     display: block;
