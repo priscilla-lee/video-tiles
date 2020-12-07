@@ -54,8 +54,6 @@ let nextToastNum = 0;
 
 // TODO(10): Test on Firefox.
 
-// TODO(12): Better logging (log parameters too).
-
 // TODO(13): Apply JS tips/tricks/best practices from Fireship's YouTube
 // channel.
 
@@ -150,6 +148,20 @@ function _setVideoGridVolumeAndColor(localUserCoordinates) {
 }
 
 /*******************************************************************************
+ * Update the local user's location on the tile grid.
+ ******************************************************************************/
+function _moveVideoTileTo(row, col) {
+  const coordinates = {row: row, col: col};
+  if (row < 0 || row >= NUM_ROWS || col < 0 || col >= NUM_COLS) {
+    console.log(`Tile {row: ${row}, col: ${col}} is out of bounds`);
+  } else if (_isTileAvailable(coordinates)) {
+    _doUserMove(coordinates);
+  } else {
+    console.log(`Tile {row: ${row}, col: ${col}} is already occupied`);
+  }
+}
+
+/*******************************************************************************
  * Add a Bootstrap toast component with the given message.
  ******************************************************************************/
 function _addToast(toastMessage, toastColor) {
@@ -175,7 +187,7 @@ function _addToast(toastMessage, toastColor) {
  * Initialize the grid of video elements, each inside a video tile.
  ******************************************************************************/
 function _initializeVideoGrid() {
-  console.log('_initializeVideoGrid');
+  console.log('_initializeVideoGrid()');
 
   // Create the grid of videos
   videoGrid = [];
@@ -200,7 +212,7 @@ function _initializeVideoGrid() {
         var _r = r; var _c = c; var _moveHere = moveHere; // Closure vars
         return () => {
           _moveHere.style.display = 'none';
-          _onVideoTileClick(_r, _c)
+          _moveVideoTileTo(_r, _c)
         };
       })();
 
@@ -237,18 +249,10 @@ function _initializeVideoGrid() {
     const {row, col} = allCoordinates[localUserId];
 
     switch (e.code) {
-      case 'ArrowUp':
-        _onVideoTileClick(row - 1, col);
-        break;
-      case 'ArrowDown':
-        _onVideoTileClick(row + 1, col);
-        break;
-      case 'ArrowLeft':
-        _onVideoTileClick(row, col - 1);
-        break;
-      case 'ArrowRight':
-        _onVideoTileClick(row, col + 1);
-        break;
+      case 'ArrowUp':    _moveVideoTileTo(row - 1, col); break;
+      case 'ArrowDown':  _moveVideoTileTo(row + 1, col); break;
+      case 'ArrowLeft':  _moveVideoTileTo(row, col - 1); break;
+      case 'ArrowRight': _moveVideoTileTo(row, col + 1); break;
     }
   };
 }
@@ -257,7 +261,7 @@ function _initializeVideoGrid() {
  * Create a peer connection between the local and remote users.
  ******************************************************************************/
 function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
-  console.log('_createPeerConnection');
+  console.log(`_createPeerConnection(${remoteUserId})`);
 
   // (1a) Send in local stream through a new peer connection
   let peerConnection = new RTCPeerConnection(CONFIGURATION);
@@ -320,7 +324,7 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
  * Respond to the given remote user joining the call.
  ******************************************************************************/
 async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
-  console.log('_onUserJoin');
+  console.log(`_onUserJoin(${remoteUserId})`);
 
   // Display a brief toast notification that this user joined the call
   const names = await roomDoc.collection('userSettings').doc('userNames').get();
@@ -347,7 +351,8 @@ async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
  * Respond to the given remote user moving video tile locations.
  ******************************************************************************/
 function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
-  console.log('_onUserMove');
+  console.log(`_onUserMove(${remoteUserId}, {row: ${newCoordinates.row}, ` +
+    `col: ${newCoordinates.col})}`);
 
   // Update all coordinates
   const oldCoordinates = allCoordinates[remoteUserId];
@@ -365,7 +370,7 @@ function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
  * Respond to the given remote user exiting the call.
  ******************************************************************************/
 async function _onUserExit(roomDoc, remoteUserId) {
-  console.log('_onUserExit');
+  console.log(`_onUserExit(${remoteUserId})`);
 
   // Display a brief toast notification that this user left the call
   const names = await roomDoc.collection('userSettings').doc('userNames').get();
@@ -403,7 +408,7 @@ async function _onUserExit(roomDoc, remoteUserId) {
  * Initiate a connection with the given user in the call.
  ******************************************************************************/
 function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
-  console.log('_doUserJoin');
+  console.log(`_doUserJoin(${remoteUserId})`);
 
   let peerConnection = 
     _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId);
@@ -428,7 +433,8 @@ function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
  * Move video tile locations, and broadcast the update to all users in the call.
  ******************************************************************************/
 function _doUserMove(newCoordinates) {
-  console.log('_doUserMove');
+  console.log(`_doUserMove({row: ${newCoordinates.row}, ` +
+    `col: ${newCoordinates.col})}`);
 
   // Update coordinates
   const oldCoordinates = allCoordinates[localUserId];
@@ -453,7 +459,7 @@ function _doUserMove(newCoordinates) {
  * Terminate the connections with all the users in the call.
  ******************************************************************************/
 function _doUserExit() {
-  console.log('_doUserExit');
+  console.log('_doUserExit()');
 
   // Stop the local stream.
   if (localStream) {
@@ -479,7 +485,7 @@ function _doUserExit() {
  * Wait for other user(s) to join the room, move tiles, or leave the room.
  ******************************************************************************/
 function _waitForOtherUsers(roomDoc) {
-  console.log('_waitForOtherUsers');
+  console.log('_waitForOtherUsers()');
 
   roomDoc.collection(`from${localUserId}`).onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
@@ -511,7 +517,7 @@ function _waitForOtherUsers(roomDoc) {
  * Create a new room (first user on the video call).
  ******************************************************************************/
 async function _createRoom(roomName) {
-  console.log('_createRoom');
+  console.log(`_createRoom(${roomName})`);
 
   // Verify that this room name isn't being used already
   roomsCollection = await firebase.firestore().collection('rooms');
@@ -565,7 +571,7 @@ async function _createRoom(roomName) {
  * Join a room (initiate peer connections with all the users in the room).
  ******************************************************************************/
 async function _joinRoom(roomName) {
-  console.log('_joinRoom');
+  console.log(`_joinRoom(${roomName})`);
 
   // Verify that this room name exists
   roomsCollection = await firebase.firestore().collection('rooms');
@@ -627,7 +633,7 @@ async function _joinRoom(roomName) {
  * Leave the room (terminate peer connections with all the users in the room).
  ******************************************************************************/
 async function _leaveRoom(roomId) {
-  console.log('_leaveRoom');
+  console.log('_leaveRoom()');
 
   // Terminate peer connections with all the users in the room.
    _doUserExit();
@@ -686,7 +692,7 @@ async function _leaveRoom(roomId) {
  * On cameraBtn click, open user media.
  ******************************************************************************/
 async function _onCameraBtnClick(e) {
-  console.log('_onCameraBtnClick');
+  console.log('Clicked the "Enable Camera & Mic" button');
 
   const userNameInput = _dom('#userNameInput');
   const roomNameInput = _dom('#roomNameInput');
@@ -721,7 +727,7 @@ async function _onCameraBtnClick(e) {
  * On createBtn click, create a new room with the given name.
  ******************************************************************************/
 function _onCreateBtnClick(e) {
-  console.log('_onCreateBtnClick');
+  console.log('Clicked the "Create Room" button');
 
   localUserName = _dom('#userNameInput').value;
   roomName = _dom('#roomNameInput').value;
@@ -745,7 +751,7 @@ function _onCreateBtnClick(e) {
  * On joinBtn click, join the room with the given name.
  ******************************************************************************/
 function _onJoinBtnClick(e) {
-  console.log('_onJoinBtnClick');
+  console.log('Clicked the "Join Room" button');
 
   localUserName = _dom('#userNameInput').value;
   roomName = _dom('#roomNameInput').value;
@@ -769,26 +775,10 @@ function _onJoinBtnClick(e) {
  * On hangupBtn click, leave the room.
  ******************************************************************************/
 async function _onHangupBtnClick(e) {
-  console.log('_onHangupBtnClick');
+  console.log('Clicked the "Leave Room" button');
 
   await _leaveRoom(roomId);
   document.location.reload(true);
-}
-
-/*******************************************************************************
- * On videoTile click, update the local user's location on the tile grid.
- ******************************************************************************/
-function _onVideoTileClick(row, col) {
-  console.log('_onVideoTileClick');
-
-  const coordinates = {row: row, col: col};
-  if (row < 0 || row >= NUM_ROWS || col < 0 || col >= NUM_COLS) {
-    console.log('That tile is out of bounds!');
-  } else if (_isTileAvailable(coordinates)) {
-    _doUserMove(coordinates);
-  } else {
-    console.log('That tile is already occupied!');
-  }
 }
 
 // Add all the button click event listeners
