@@ -798,7 +798,7 @@ async function _onCreateBtnClick(e) {
     _dom('#currentUser').innerText = `User: ${localUserName}`;
     _dom('#currentRoom').innerText = `Room: ${roomName}`;
     _dom('#homePage').style.display = 'none';
-    _dom('#roomPage').style.display = 'block';
+    _dom('#roomPage').style.display = 'flex';
   }
 }
 
