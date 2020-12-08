@@ -61,7 +61,7 @@ const RESPONSE = {
   ROOM_ALREADY_EXISTS_ERROR: 2
 };
 const NUM_ROWS = 6;  // Number of rows in the video tile grid
-const NUM_COLS = 12; // Number of cols in the video tile grid
+const NUM_COLS = 13; // Number of cols in the video tile grid
 
 /*******************************************************************************
  * Global variables

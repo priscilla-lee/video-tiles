@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>VideoTiles</title>
 
-    <!-- TODO(2): Fix the layout of the page on mobile, responsive widths, and different
-         size browser windows, etc. For example, center the video tile grid if there is
-         whitespace on the sides. -->
+    <!-- TODO(2): Fix the layout of the page for mobile and responsive widths. -->
 
     <!-- TODO(3a): Stress test it with 5-10 devices. Check whether the 'disconnected'
          and 'failed' connection states reliably indicate a user's exit -->
@@ -82,7 +80,9 @@
 
 <!-- The room page that the user sees once they create or join a room -->
 <div id="roomPage" style="display: none;">
-    <div id="videoTileGrid"></div>
+    <div id="videoTileGridContainer">
+        <div id="videoTileGrid"></div>
+    </div>
     <div id="toastContainer"></div>
     <div id="bottomBarShadow"></div>
     <div id="bottomBar">

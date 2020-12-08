@@ -33,49 +33,7 @@
     padding: 10px 0 20px;
 }
 
-/* Video grid styling */
-
-#videoTileGrid {
-    background: white;
-    display: grid;
-    grid-template-rows: repeat(6, 180px);
-    grid-template-columns: repeat(12, 180px);
-    flex: 1 0 auto;
-}
-
-#videoTileGrid > .videoTile {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 3px solid white;
-    background: lightsteelblue;
-    border-radius: 5px;
-}
-
-#videoTileGrid > .videoTile > .moveHere {
-    display: none;
-    cursor: pointer;
-    position: absolute;
-    text-align: center;
-    color: white;
-    height: 180px;
-    width: 180px;
-}
-
-#videoTileGrid > .videoTile > video {
-    background: transparent;
-    display: block;
-    height: 160px;
-    width: 160px;
-    object-fit: cover;
-    border-radius: 5px;
-}
-
-#videoTileGrid > .videoTile > #localVideo {
-    transform: scaleX(-1);
-}
-
-/* Other room page styling */
+/* Room page styling */
 
 html, body, #roomPage {
     height: 100%;
@@ -84,6 +42,14 @@ html, body, #roomPage {
 #roomPage {
     /* display: flex; set in app.js */
     flex-direction: column;
+    background: slategrey;
+}
+
+#videoTileGridContainer {
+    flex: 1 0 auto;
+    display: flex;
+    margin: auto;     /* center horizontally */
+    align-items: center; /* and vertically */
 }
 
 ::-webkit-scrollbar {
@@ -132,4 +98,45 @@ html, body, #roomPage {
 .h5 {
     line-height: 38px;
     margin: 0;
+}
+
+/* Video grid styling */
+
+#videoTileGrid {
+    background: lightgrey;
+    display: grid;
+    grid-template-rows: repeat(6, 160px);
+    grid-template-columns: repeat(13, 160px);
+}
+
+#videoTileGrid > .videoTile {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 3px solid lightgrey;
+    background: lightsteelblue;
+    border-radius: 5px;
+}
+
+#videoTileGrid > .videoTile > .moveHere {
+    display: none;
+    cursor: pointer;
+    position: absolute;
+    text-align: center;
+    color: white;
+    height: 160px;
+    width: 160px;
+}
+
+#videoTileGrid > .videoTile > video {
+    background: transparent;
+    display: block;
+    height: 140px;
+    width: 140px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+#videoTileGrid > .videoTile > #localVideo {
+    transform: scaleX(-1);
 }
