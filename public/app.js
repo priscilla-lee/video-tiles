@@ -37,20 +37,20 @@ const AUDIO_CONSTRAINTS = {
 const PROXIMITY = {
   NEAREST:  2,
   NEAR:     4,
-  FAR:      6,
+  FAR:      7,
   FARTHEST: 8
 };
 const VOLUME = {
   NEAREST:  1.0,
-  NEAR:     0.5,
-  FAR:      0.1,
+  NEAR:     0.4,
+  FAR:      0.05,
   FARTHEST: 0.0
 };
 const COLOR = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
-  NEAREST:     '#a4c2db', // 75%
-  NEAR:        '#6d9dc5', // 60%
-  FAR:         '#4178a4', // 45%
-  FARTHEST:    '#2c506d', // 30%
+  NEAREST:     '#dae7f1', // 90%
+  NEAR:        '#7eaacd', // 65%
+  FAR:         '#396a93', // 40%
+  FARTHEST:    '#1d3549', // 20%
   TOAST_JOIN:  'rgba(220, 255, 210, 0.9)', // Green
   TOAST_LEAVE: 'rgba(255, 220, 220, 0.9)'  // Red
 };
@@ -60,8 +60,12 @@ const RESPONSE = {
   ROOM_DOESNT_EXIST_ERROR: 1,
   ROOM_ALREADY_EXISTS_ERROR: 2
 };
-const NUM_ROWS = 6;  // Number of rows in the video tile grid
-const NUM_COLS = 13; // Number of cols in the video tile grid
+// Number of rows and cols in the entire video tile grid
+const NUM_ROWS = 7;
+const NUM_COLS = 15;
+// Number of rows and cols in a "private" room (in each corner of the grid)
+const PRIVATE_ROWS = 2;
+const PRIVATE_COLS = 4;
 
 /*******************************************************************************
  * Global variables
@@ -173,32 +177,111 @@ function _setBitrateLimit(sdp) {
 }
 
 /*******************************************************************************
+ * Return an array of coordinates representing the private room that contains
+ * the given location. If the given location is not in a private room, return
+ * null.
+ ******************************************************************************/
+function _getPrivateRoom({row, col}) {
+  // Helper function to grab all coordinates within a bounding box
+  function _getAllCoordinates(startRow, endRow, startCol, endCol) {
+    const coordinates = [];
+    for (let r = startRow; r < endRow; r++) {
+      for (let c = startCol; c < endCol; c++) {
+        coordinates.push({row: r, col: c});
+      }
+    }
+    return coordinates;
+  }
+
+  // Check all four corners
+  const top = (row >= 0 && row < PRIVATE_ROWS);
+  const bottom = (row >= NUM_ROWS - PRIVATE_ROWS && row < NUM_ROWS);
+  const left = (col >= 0 && col < PRIVATE_COLS);
+  const right = (col >= NUM_COLS - PRIVATE_COLS && col < NUM_COLS);
+
+  if (top && left) {
+    return _getAllCoordinates(0, PRIVATE_ROWS,
+                              0, PRIVATE_COLS);
+  } else if (bottom && left) {
+    return _getAllCoordinates(NUM_ROWS - PRIVATE_ROWS, NUM_ROWS,
+                              0, PRIVATE_COLS);
+  } else if (top && right) {
+    return _getAllCoordinates(0, PRIVATE_ROWS,
+                              NUM_COLS - PRIVATE_COLS, NUM_COLS);
+  } else if (bottom && right) {
+    return _getAllCoordinates(NUM_ROWS - PRIVATE_ROWS, NUM_ROWS,
+                              NUM_COLS - PRIVATE_COLS, NUM_COLS);
+  } else {
+    return null;
+  }
+}
+
+/*******************************************************************************
  * Set the volume and color of each video in the grid based on its proximity to
  * the local user's current location.
  ******************************************************************************/
-function _setVideoGridVolumeAndColor({row: localRow, col: localCol}) {
-  for (let r = 0; r < NUM_ROWS; r++) {
-    for (let c = 0; c < NUM_COLS; c++) {
-      const dr = Math.abs(localRow - r);
-      const dc = Math.abs(localCol - c);
-      let proximityBasedColor;
-      let proximityBasedVolume;
-      if (dr < PROXIMITY.NEAREST && dc < PROXIMITY.NEAREST) {
-        proximityBasedColor = COLOR.NEAREST;
-        proximityBasedVolume = VOLUME.NEAREST;
-      } else if (dr < PROXIMITY.NEAR && dc < PROXIMITY.NEAR) {
-        proximityBasedColor = COLOR.NEAR;
-        proximityBasedVolume = VOLUME.NEAR;
-      } else if (dr < PROXIMITY.FAR && dc < PROXIMITY.FAR) {
-        proximityBasedColor = COLOR.FAR;
-        proximityBasedVolume = VOLUME.FAR;
-      } else {
-        proximityBasedColor = COLOR.FARTHEST;
-        proximityBasedVolume = VOLUME.FARTHEST;
-      }
-      videoTileGrid[r][c].style.background = proximityBasedColor;
-      videoGrid[r][c].volume = proximityBasedVolume;
+function _setVideoGridVolumeAndColor(localCoordinates) {
+  // Helper function to apply a color and volume to a private room
+  function _apply(privateRoom, color, volume) {
+    for (const {row: r, col: c} of privateRoom) {
+        videoTileGrid[r][c].style.background = color;
+        videoGrid[r][c].volume = volume;
     }
+  }
+
+  const {row: localRow, col: localCol} = localCoordinates;
+
+  // Case 1: The user is in a private room
+  const privateRoom = _getPrivateRoom(localCoordinates);
+  if (privateRoom !== null) {
+    // Darken everywhere
+    for (let r = 0; r < NUM_ROWS; r++) {
+      for (let c = 0; c < NUM_COLS; c++) {
+        videoTileGrid[r][c].style.background = COLOR.FARTHEST;
+        videoGrid[r][c].volume = VOLUME.FARTHEST;
+      }
+    }
+
+    // Then light up the room
+    _apply(privateRoom, COLOR.NEAREST, VOLUME.NEAREST);
+  }
+
+  // Case 2: The user is NOT in a private room
+  else {
+    // Color the main room
+    for (let r = 0; r < NUM_ROWS; r++) {
+      for (let c = 0; c < NUM_COLS; c++) {
+        const dr = Math.abs(localRow - r);
+        const dc = Math.abs(localCol - c);
+        let proximityBasedColor;
+        let proximityBasedVolume;
+        if (dr < PROXIMITY.NEAREST && dc < PROXIMITY.NEAREST) {
+          proximityBasedColor = COLOR.NEAREST;
+          proximityBasedVolume = VOLUME.NEAREST;
+        } else if (dr < PROXIMITY.NEAR && dc < PROXIMITY.NEAR) {
+          proximityBasedColor = COLOR.NEAR;
+          proximityBasedVolume = VOLUME.NEAR;
+        } else if (dr < PROXIMITY.FAR && dc < PROXIMITY.FAR) {
+          proximityBasedColor = COLOR.FAR;
+          proximityBasedVolume = VOLUME.FAR;
+        } else {
+          proximityBasedColor = COLOR.FARTHEST;
+          proximityBasedVolume = VOLUME.FARTHEST;
+        }
+        videoTileGrid[r][c].style.background = proximityBasedColor;
+        videoGrid[r][c].volume = proximityBasedVolume;
+      }
+    }
+
+    // Then darken all the private rooms
+    _apply(_getPrivateRoom({row: 0, col: 0}),
+      COLOR.FARTHEST, VOLUME.FARTHEST);
+    _apply(_getPrivateRoom({row: NUM_ROWS - 1, col: 0}),
+      COLOR.FARTHEST, VOLUME.FARTHEST);
+    _apply(_getPrivateRoom({row: 0, col: NUM_COLS - 1}),
+      COLOR.FARTHEST, VOLUME.FARTHEST);
+    _apply(_getPrivateRoom({row: NUM_ROWS - 1, col: NUM_COLS - 1}),
+      COLOR.FARTHEST, VOLUME.FARTHEST);
   }
 }
 
