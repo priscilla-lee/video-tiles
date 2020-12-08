@@ -1,5 +1,7 @@
-// Constants
-const CONFIGURATION = {
+/*******************************************************************************
+ * Configs, constraints, and constants
+ ******************************************************************************/
+const P2P_CONFIG = {
   iceCandidatePoolSize: 10,
   iceServers: [{
     urls: [
@@ -8,37 +10,62 @@ const CONFIGURATION = {
     ],
   }]
 };
+// Even lower quality settings than the "good enough" video quality settings
+// recommended by youtu.be/X2gLy4QRK9k (which claims to be able to support up
+// to 10 users in a naive mesh network)
+const VIDEO_CONSTRAINTS = {
+  // QVGA (Quarter VGA) settings
+  width:     { ideal: 320 },
+  height:    { ideal: 240 },
+  // Maximum number of frames per second allowed
+  frameRate: { min: 1, max: 15 },
+  // Maximum number of bits per second allowed
+  MAX_BIT_RATE: 180000,
+  // Factor by which to scale down the video's resolution in each dimension
+  DOWNSCALE_FACTOR: 1.2
+};
+// Copied from youtu.be/X2gLy4QRK9k
+const AUDIO_CONSTRAINTS = {
+  googEchoCancellation:  true,
+  googAutoGainControl:   true,
+  googNoiseSuppression:  true,
+  googHighpassFilter:    true,
+  googNoiseSuppression2: true,
+  googEchoCancellation2: true,
+  googAutoGainControl2:  true
+};
 const PROXIMITY = {
   NEAREST:  2,
   NEAR:     4,
   FAR:      6,
   FARTHEST: 8
-}
+};
 const VOLUME = {
   NEAREST:  1.0,
   NEAR:     0.5,
   FAR:      0.1,
   FARTHEST: 0.0
-}
+};
 const COLOR = { // www.w3schools.com/colors/colors_picker.asp?colorhex=4682B4
   NEAREST:     '#a4c2db', // 75%
   NEAR:        '#6d9dc5', // 60%
   FAR:         '#4178a4', // 45%
   FARTHEST:    '#2c506d', // 30%
-  TOAST_JOIN:  'rgba(220, 255, 210, 0.9)', // green
-  TOAST_LEAVE: 'rgba(255, 220, 220, 0.9)'  // red
-}
+  TOAST_JOIN:  'rgba(220, 255, 210, 0.9)', // Green
+  TOAST_LEAVE: 'rgba(255, 220, 220, 0.9)'  // Red
+};
+// Responses for creating or joining a room
 const RESPONSE = {
   SUCCESS: 0,
   ROOM_DOESNT_EXIST_ERROR: 1,
   ROOM_ALREADY_EXISTS_ERROR: 2
-}
-const MAX_BITRATE = 250000;
-const SCALE_RESOLUTION_DOWN_BY = 2;
-const NUM_ROWS = 6;
-const NUM_COLS = 12;
+};
+const NUM_ROWS = 6;  // Number of rows in the video tile grid
+const NUM_COLS = 12; // Number of cols in the video tile grid
 
-// Global variables
+/*******************************************************************************
+ * Global variables
+ ******************************************************************************/
 let roomsCollection = null;
 let roomId = null;
 let roomName = null;
@@ -102,9 +129,47 @@ function _downscaleVideo(peerConnection) {
     s => s.track.kind === 'video');
   const params = videoSender.getParameters();
   if (!params.encodings) { params.encodings = [{}]; }
-  params.encodings[0].scaleResolutionDownBy = SCALE_RESOLUTION_DOWN_BY;
-  params.encodings[0].maxBitrate = MAX_BITRATE;
+  params.encodings[0].maxBitrate = VIDEO_CONSTRAINTS.MAX_BIT_RATE;
+  params.encodings[0].scaleResolutionDownBy =
+    VIDEO_CONSTRAINTS.DOWNSCALE_FACTOR;
   videoSender.setParameters(params);
+}
+
+/*******************************************************************************
+ * Return a new SDP that limits video bandwidth by setting its bitrate.
+ * Modified from https://webrtchacks.com/limit-webrtc-bandwidth-sdp/
+ ******************************************************************************/
+function _setBitrateLimit(sdp) {
+  let lines = sdp.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('m=video')) {
+      console.log('Setting the bitrate of this SDP to ' +
+        `${VIDEO_CONSTRAINTS.MAX_BIT_RATE} per second`);
+
+      // Pass the m line
+      let line = i + 1;
+
+      // Skip i and c lines
+      while (lines[line].startsWith('i=') || lines[line].startsWith('c=')) {
+        line++;
+      }
+
+      // If we're on a b line, replace it
+      if (lines[line].startsWith('b')) {
+        lines[line] = `b=AS:${VIDEO_CONSTRAINTS.MAX_BIT_RATE/1000}`;
+        return lines.join('\n');
+      }
+
+      // Add a new b line
+      let newLines = lines.slice(0, line);
+      newLines.push(`b=AS:${VIDEO_CONSTRAINTS.MAX_BIT_RATE/1000}`);
+      newLines = newLines.concat(lines.slice(line, lines.length));
+      return newLines.join('\n')
+    }
+  }
+
+  console.log('Unable to set the bitrate of this SDP (missing m=video line)');
+  return sdp;
 }
 
 /*******************************************************************************
@@ -254,7 +319,7 @@ function _createPeerConnection(roomDoc, p2pDoc, localUserId, remoteUserId) {
   console.log(`_createPeerConnection(${remoteUserId})`);
 
   // (1a) Send in local stream through a new peer connection
-  const peerConnection = new RTCPeerConnection(CONFIGURATION);
+  const peerConnection = new RTCPeerConnection(P2P_CONFIG);
   peerConnections[`to${remoteUserId}`] = peerConnection;
   localStream.getTracks().forEach(t => { 
     peerConnection.addTrack(t, localStream);
@@ -331,8 +396,9 @@ async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
 
   // Send a response
   const answer = await peerConnection.createAnswer();
-  p2pDoc.update({answer: { type: answer.type, sdp: answer.sdp }});
   await peerConnection.setLocalDescription(answer);
+  answer.sdp = _setBitrateLimit(answer.sdp);
+  p2pDoc.update({answer: { type: answer.type, sdp: answer.sdp }});
 
   _downscaleVideo(peerConnection);
 }
@@ -413,8 +479,9 @@ async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
 
   // Initiate an offer
   const offer = await peerConnection.createOffer();
-  p2pDoc.set({offer: { type: offer.type, sdp: offer.sdp }});
   await peerConnection.setLocalDescription(offer);
+  offer.sdp = _setBitrateLimit(offer.sdp);
+  p2pDoc.set({offer: { type: offer.type, sdp: offer.sdp }});
 
   _downscaleVideo(peerConnection);
 }
@@ -707,8 +774,8 @@ async function _onCameraBtnClick(e) {
   roomNameInput.oninput = enableCreateOrJoinRoom;
 
   // Capture the local stream
-  localStream = await navigator.mediaDevices.getUserMedia(
-      {video: true, audio: true});
+  localStream = await navigator.mediaDevices.getUserMedia({
+    video: VIDEO_CONSTRAINTS, audio: AUDIO_CONSTRAINTS});
   _dom('#localVideoPreview').srcObject = localStream;
 }
 
