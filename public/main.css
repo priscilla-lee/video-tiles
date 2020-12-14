@@ -28,9 +28,22 @@
     margin: auto;
 }
 
+#aboutBtn {
+    margin: 27px 5px 0;
+    vertical-align: top;
+}
+
 #createOrJoinBtnGroup {
     width: 100%;
     padding: 10px 0 20px;
+}
+
+#createBtn {
+    margin-right: 5px;
+}
+
+#joinBtn {
+    margin-left: 5px;
 }
 
 /* Room page styling */
@@ -128,6 +141,7 @@ html, body, #roomPage {
     color: white;
     height: 140px;
     width: 145px;
+    font-size: larger;
 }
 
 #videoTileGrid > .videoTile > video {

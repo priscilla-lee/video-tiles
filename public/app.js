@@ -18,9 +18,9 @@ const VIDEO_CONSTRAINTS = {
   width:     { ideal: 320 },
   height:    { ideal: 240 },
   // Maximum number of frames per second allowed
-  frameRate: { min: 1, max: 15 },
+  frameRate: { min: 1, ideal: 15, max: 20 },
   // Maximum number of bits per second allowed
-  MAX_BIT_RATE: 180000,
+  MAX_BIT_RATE: 200000,
   // Factor by which to scale down the video's resolution in each dimension
   DOWNSCALE_FACTOR: 1.2
 };
@@ -491,7 +491,7 @@ async function _onUserJoin(roomDoc, p2pDoc, remoteUserId) {
  ******************************************************************************/
 function _onUserMove(roomDoc, newCoordinates, remoteUserId) {
   const {row: newRow, col: newCol} = newCoordinates;
-  console.log(`_onUserMove(${remoteUserId}, {row: ${newRow}, col: ${newCol})}`);
+  console.debug(`_onUserMove(${remoteUserId}, {row: ${newRow}, col: ${newCol})}`);
 
   // Update all coordinates
   const {row: oldRow, col: oldCol} = allCoordinates[remoteUserId];
@@ -574,7 +574,7 @@ async function _doUserJoin(roomDoc, p2pDoc, remoteUserId) {
  ******************************************************************************/
 function _doUserMove(newCoordinates) {
   const {row: newRow, col: newCol} = newCoordinates;
-  console.log(`_doUserMove({row: ${newRow}, col: ${newCol})}`);
+  console.debug(`_doUserMove({row: ${newRow}, col: ${newCol})}`);
 
   // Update coordinates
   const {row: oldRow, col: oldCol} = allCoordinates[localUserId];
@@ -904,7 +904,7 @@ async function _onJoinBtnClick(e) {
     _dom('#currentUser').innerText = `User: ${localUserName}`;
     _dom('#currentRoom').innerText = `Room: ${roomName}`;
     _dom('#homePage').style.display = 'none';
-    _dom('#roomPage').style.display = 'block';
+    _dom('#roomPage').style.display = 'flex';
   }
 }
 
