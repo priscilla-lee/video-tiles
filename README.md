@@ -37,9 +37,9 @@ example, I wished we could:
 * Overhear the joy and laughter of a nearby conversation
 
 I couldn't find an existing video chat app that accomplished 
-this[<sup><b>(1)</b></sup>](#footnote), so I decided to take a stab at it myself.
-I now present to you [VideoTiles](https://video-tiles.web.app), my very, *very*
-rudimentary proof of concept video chat app.
+this[<sup><b>(1)</b></sup>](#footnote), so I decided to take a stab at it
+myself. I now present to you [VideoTiles](https://video-tiles.web.app), my
+very, *very* rudimentary proof of concept video chat app.
 
 ## How to Use
 
@@ -49,7 +49,8 @@ The interface is fairly simple. All you need to do is:
 
 0. Enable your camera and microphone
 1. Create a room (with whatever username or room name you want)
-2. Have 1 or more friends join your room (using the same room name that you used)
+2. Have 1 or more friends join your room (using the same room name that you
+used)
 3. Start chatting!
 
 ![Create and join a room](screenshots/create_and_join.png)
@@ -82,8 +83,8 @@ meant to fit within a laptop (or even monitor) screen. But you can always
 
 Each of the grid's four corners has a 2x4 **"private room"**. Private rooms 
 have **all-or-nothing** audio. That is, only people within a given private
-room will be able to hear each other. Anybody outside the private room will
-not be able to hear anything inside. 
+room will be able to hear each other. Anybody outside the private room will not
+be able to hear anything inside.
 
 The layout of the grid allows natural conversation clusters to form. For
 example, you could have a few groups of people chatting at varying volume
@@ -93,8 +94,8 @@ levels.
 
 ### Arrow Keys to Move
 
-In addition to being able to click to move, you may also use the arrow keys
-on your keyboard to move around. 
+In addition to being able to click to move, you may also use the arrow keys on
+your keyboard to move around.
 
 ![Use arrow keys to move](screenshots/arrows_to_move.gif)
 
@@ -104,8 +105,8 @@ TODO(1): Mention WebRTC
 
 * Link to some of the resources (YouTube talk, API docs)
 * Credit WebRTC samples code, WebRTCHacks, etc
-* How I decided not to bother with an SFU media server even though it
-would improve performance (and potentially support larger group calls)
+* How I decided not to bother with an SFU media server even though it would
+improve performance (and potentially support larger group calls)
 
 TODO(1): Mention Firebase
 
@@ -115,8 +116,8 @@ TODO(1): Mention Bootstrap
 
 ## Footnotes
 <div id="footnote">
-<sup><b>(1)</b></sup><sp>I later learned of this <i>incredible</i> video chat app 
-called <b>Gather</b> (https://gather.town/). It's completely FREE and supports
-all the features I wanted and more! I highly recommend that you try it out with
-friends and family!
+<sup><b>(1)</b></sup><sp>
+I later learned of this <i>incredible</i> video chat app called <b>Gather</b>
+(https://gather.town/). It's completely FREE and supports all the features I
+wanted and more! I highly recommend that you try it out with friends and family!
 </div>
